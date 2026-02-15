@@ -1,5 +1,7 @@
 # Mississippi Prescribed Fire Weather Dashboard
 
+[![View Live Dashboard](https://img.shields.io/badge/🚀-View%20Live%20Dashboard-orange?style=for-the-badge)](https://mississippi-prescribed-fire-dashboa.vercel.app/)
+
 A comprehensive web-based decision support tool for prescribed fire managers, providing real-time weather, air quality, and fire behavior indices.
 
 ## 🚀 Key Features
