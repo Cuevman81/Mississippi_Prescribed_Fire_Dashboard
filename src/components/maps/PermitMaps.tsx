@@ -36,14 +36,15 @@ export default function PermitMaps({ permits, type }: Props) {
         <HeatmapLayer permits={validPermits} />
       )}
 
-      {validPermits.map((p, i) => {
+      {validPermits.map((p) => {
         const position: [number, number] = [p.latitude, p.longitude];
+        const markerKey = `${type}-${p.objectId}`;
 
         // Smoke type: render arrow markers
         if (type === 'smoke' && p.windDeg != null && p.windSpeed > 0) {
           return (
             <WindArrowMarker
-              key={i}
+              key={markerKey}
               position={position}
               windDeg={p.windDeg}
               windSpeed={p.windSpeed}
@@ -57,20 +58,32 @@ export default function PermitMaps({ permits, type }: Props) {
           ? Math.max(3, Math.min(8, Math.sqrt(p.burnAcresEstimate || 1) * 0.4))
           : Math.max(4, Math.min(12, Math.sqrt(p.burnAcresEstimate || 1) * 0.5));
 
-        const fillColor = type === 'dispersion'
-          ? (PERMIT_DISPERSION_COLORS[p.dispersionQuality] || '#999999')
-          : '#dc2626';
-        const strokeColor = type === 'dispersion' ? '#666666' : '#991b1b';
+        let fillColor = '#dc2626'; // Default red for density
+        let strokeColor = '#991b1b';
+
+        if (type === 'dispersion') {
+          const qual = (p.dispersionQuality || '').toLowerCase();
+          if (qual.includes('good')) {
+            fillColor = '#22c55e'; // Vibrant Green
+          } else if (qual.includes('fair')) {
+            fillColor = '#eab308'; // Vibrant Yellow
+          } else if (qual.includes('poor')) {
+            fillColor = '#ef4444'; // Vibrant Red
+          } else {
+            fillColor = '#94a3b8'; // Grey for unknown
+          }
+          strokeColor = '#1e293b';
+        }
 
         return (
           <CircleMarker
-            key={i}
+            key={markerKey}
             center={position}
             radius={radius}
             fillColor={fillColor}
-            fillOpacity={type === 'density' ? 0.8 : 0.6}
+            fillOpacity={type === 'density' ? 0.8 : 0.7}
             color={strokeColor}
-            weight={1}
+            weight={1.5}
           >
             <Popup>
               <PermitPopup permit={p} />

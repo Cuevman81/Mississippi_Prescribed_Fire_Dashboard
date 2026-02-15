@@ -8,7 +8,7 @@ import { SmokeDispersion } from '@/components/dashboard/SmokeDispersion';
 import { FireIndices } from '@/components/dashboard/FireIndices';
 import { BurnQualityChart } from '@/components/dashboard/BurnQualityChart';
 import { WeatherTrendChart } from '@/components/dashboard/WeatherTrendChart';
-import { Flame, Loader2, Map as MapIcon } from 'lucide-react';
+import { Flame, Loader2 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
 const LocationMap = dynamic(() => import('@/components/maps/LocationMap'), {

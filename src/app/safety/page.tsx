@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { ShieldCheck, AlertTriangle, ExternalLink, BookOpen, Phone, FileCheck } from 'lucide-react';
+import { AlertTriangle, ExternalLink, BookOpen, FileCheck } from 'lucide-react';
 
 const CHECKLIST = {
   'Phase 1: Planning & Preparation': [

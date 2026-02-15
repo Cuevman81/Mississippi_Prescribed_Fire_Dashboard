@@ -5,11 +5,21 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, Wind } from 'lucide-react';
 import { getAQIColor, getAQITextColor, getAQIRecommendation, shouldAvoidBurning } from '@/lib/aqi-utils';
 import dynamic from 'next/dynamic';
+import { useMemo } from 'react';
 
 const MonitorMap = dynamic(() => import('@/components/maps/MonitorMap'), { ssr: false });
 
 export default function AirQualityPage() {
   const { currentAQI, aqiForecast, aqiMonitors, isLoading, location } = useDashboard();
+
+  // Separate forecasts by date
+  const { today, tomorrowDate } = useMemo(() => {
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+    const tomorrow = new Date(now.getTime() + 86400000);
+    const tomorrowStr = tomorrow.toISOString().split('T')[0];
+    return { today: todayStr, tomorrowDate: tomorrowStr };
+  }, []);
 
   if (isLoading) {
     return (
@@ -31,10 +41,7 @@ export default function AirQualityPage() {
   const getCategoryName = (obs: { category?: { name?: string } }): string =>
     obs?.category?.name ?? 'Unknown';
 
-  // Separate forecasts by date
-  const today = new Date().toISOString().split('T')[0];
   const todayForecast = aqiForecast.filter((f) => f.dateForecast === today);
-  const tomorrowDate = new Date(Date.now() + 86400000).toISOString().split('T')[0];
   const tomorrowForecast = aqiForecast.filter((f) => f.dateForecast === tomorrowDate);
 
   // Check if burning should be avoided

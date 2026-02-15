@@ -1,6 +1,6 @@
 'use client';
 
-import { CheckCircle2, XCircle, AlertTriangle, Info } from 'lucide-react';
+import { CheckCircle2, XCircle, Info } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { useDashboard } from '@/lib/dashboard-context';
 

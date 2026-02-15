@@ -2,7 +2,7 @@
 
 import { useDashboard } from '@/lib/dashboard-context';
 import { getBurnQualityColor } from '@/lib/constants';
-import { Flame, MapPin, Calendar, Clock, Wind, Thermometer, Droplets, ArrowUpDown } from 'lucide-react';
+import { Flame, MapPin, Wind, Thermometer, Droplets, ArrowUpDown } from 'lucide-react';
 import { useEffect } from 'react';
 
 export default function PrintPlanPage() {
@@ -84,9 +84,12 @@ export default function PrintPlanPage() {
             <div className="font-medium">Min VI:</div>
             <div>{prescription.minVentilationIndex.toLocaleString()}</div>
 
-            <div className="font-medium">Days Since Rain:</div>
-            <div>{prescription.daysSinceRain} days</div>
+            <div className="font-medium text-orange-700">Days Since Rain (Rx):</div>
+            <div className="text-orange-700 font-bold">{prescription.daysSinceRain} days</div>
           </div>
+          <p className="mt-2 text-[10px] text-slate-400 italic">
+            * &apos;Days Since Rain&apos; is a manual prescription parameter used for fuel moisture models.
+          </p>
         </section>
       </div>
 

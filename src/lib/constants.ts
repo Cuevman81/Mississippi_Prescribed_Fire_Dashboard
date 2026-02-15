@@ -131,9 +131,9 @@ export const SMOKE_COLORS: Record<string, string> = {
 
 // MFC Permit dispersion quality colors
 export const PERMIT_DISPERSION_COLORS: Record<string, string> = {
-  'Poor (Trapping)': '#FF9999',
-  'Fair': '#FFFF99',
-  'Good (Clearing)': '#99FF99',
+  'Poor (Trapping)': '#ef4444',
+  'Fair': '#eab308',
+  'Good (Clearing)': '#22c55e',
 };
 
 // 16-point compass directions

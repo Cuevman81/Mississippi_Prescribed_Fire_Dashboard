@@ -9,7 +9,11 @@ import dynamic from 'next/dynamic';
 const DroughtMap = dynamic(() => import('@/components/maps/DroughtMap'), { ssr: false });
 
 export default function DroughtPage() {
-  const [droughtData, setDroughtData] = useState<GeoJSON.FeatureCollection | null>(null);
+  const [droughtData, setDroughtData] = useState<{
+    type: string;
+    features: unknown[];
+    lastUpdated?: string;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -31,11 +35,18 @@ export default function DroughtPage() {
   return (
     <div className="space-y-4">
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardTitle className="text-sm font-medium text-slate-500 flex items-center gap-2">
             <Droplets className="h-4 w-4 text-blue-500" />
             U.S. Drought Monitor
           </CardTitle>
+          {droughtData?.lastUpdated && (
+            <p className="text-[10px] text-slate-400">
+              Last updated: {new Date(droughtData.lastUpdated).toLocaleDateString('en-US', {
+                month: 'short', day: 'numeric', year: 'numeric'
+              })}
+            </p>
+          )}
         </CardHeader>
         <CardContent>
           {loading ? (

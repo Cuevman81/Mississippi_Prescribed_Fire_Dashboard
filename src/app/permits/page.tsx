@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -36,6 +36,7 @@ export default function PermitsPage() {
   const [dateRange, setDateRange] = useState<DateRange>('today');
   const [liveWeather, setLiveWeather] = useState<Record<string, CountyWeather>>({});
   const [weatherLoading, setWeatherLoading] = useState(false);
+  const weatherFetchedRef = useRef<string>('');
 
   // Fetch permits
   useEffect(() => {
@@ -129,8 +130,13 @@ export default function PermitsPage() {
   }, []);
 
   useEffect(() => {
-    if (todayPermits.length > 0) {
-      fetchLiveWeather(todayPermits);
+    const permitsHash = todayPermits.map(p => p.objectId).join(',');
+    if (todayPermits.length > 0 && weatherFetchedRef.current !== permitsHash) {
+      weatherFetchedRef.current = permitsHash;
+      // Defer to avoid cascading render warning
+      requestAnimationFrame(() => {
+        fetchLiveWeather(todayPermits);
+      });
     }
   }, [todayPermits, fetchLiveWeather]);
 
@@ -162,16 +168,31 @@ export default function PermitsPage() {
 
   // Stats
   const stats = useMemo(() => {
-    const total = permits.length;
-    const totalAcres = permits.reduce((s, p) => s + (p.burnAcresEstimate || 0), 0);
     const ep = enrichedTodayPermits;
     const todayCount = ep.length;
     const todayAcres = ep.reduce((s, p) => s + (p.burnAcresEstimate || 0), 0);
     const avgVI = ep.length > 0
       ? ep.reduce((s, p) => s + p.ventilationIndex, 0) / ep.length
       : 0;
-    return { total, totalAcres, todayCount, todayAcres, avgVI };
-  }, [permits, enrichedTodayPermits]);
+
+    const currentYearTotal = permits.filter(p => p.year === currentYear).length;
+    const currentYearAcres = permits.filter(p => p.year === currentYear).reduce((s, p) => s + (p.burnAcresEstimate || 0), 0);
+    
+    const prevYearTotal = permits.filter(p => p.year === prevYear).length;
+    const prevYearAcres = permits.filter(p => p.year === prevYear).reduce((s, p) => s + (p.burnAcresEstimate || 0), 0);
+
+    return { 
+      total: permits.length, 
+      totalAcres: permits.reduce((s, p) => s + (p.burnAcresEstimate || 0), 0), 
+      todayCount, 
+      todayAcres, 
+      avgVI,
+      currentYearTotal,
+      currentYearAcres,
+      prevYearTotal,
+      prevYearAcres
+    };
+  }, [permits, enrichedTodayPermits, currentYear, prevYear]);
 
   // Top 10 counties
   const topCounties = useMemo(() => {
@@ -207,99 +228,38 @@ export default function PermitsPage() {
     [enrichedTodayPermits]
   );
 
-  // Hyperbolic risk zone renderer for Recharts Customized component
-  // Uses the internal xAxisMap/yAxisMap to convert data coords → pixel coords
+  // simplified risk zone renderer for Recharts Customized component
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const RiskZoneBackground = (props: any) => {
-    const xAxis = props.xAxisMap?.[0] || Object.values(props.xAxisMap || {})[0];
-    const yAxis = props.yAxisMap?.[0] || Object.values(props.yAxisMap || {})[0];
-    if (!xAxis || !yAxis) return null;
+    const { width, height, margin } = props;
+    if (!width || !height) return null;
 
-    const xScale = xAxis.scale;
-    const yScale = yAxis.scale;
-    if (!xScale || !yScale) return null;
-
-    // Chart plotting area bounds
-    const plotLeft = xScale(0);
-    const plotRight = xScale(15);
-    const plotTop = yScale(5000);
-    const plotBottom = yScale(0);
-
-    // Generate hyperbolic boundary paths: VI = windSpeed * mixingHeight
-    // For VI = threshold, mixingHeight = threshold / windSpeed
-    const makeHyperbolaPath = (viThreshold: number) => {
-      const points: string[] = [];
-      for (let w = 0.3; w <= 15; w += 0.2) {
-        const mh = Math.min(5000, viThreshold / w);
-        const px = xScale(w);
-        const py = yScale(mh);
-        points.push(`${px},${py}`);
-      }
-      return points.join(' ');
-    };
-
-    // Zone polygons:
-    // Poor zone (VI < 20000): below the 20k hyperbola
-    // Fair zone (20000 <= VI < 40000): between 20k and 40k hyperbolas
-    // Good zone (VI >= 40000): above the 40k hyperbola
-
-    // Build polygon for "Poor" — from bottom-left, along bottom, along right, then along 20k curve back
-    const poorPoints: string[] = [];
-    poorPoints.push(`${plotLeft},${plotBottom}`); // bottom-left
-    poorPoints.push(`${plotRight},${plotBottom}`); // bottom-right
-    // Walk 20k hyperbola from right to left
-    for (let w = 15; w >= 0.3; w -= 0.2) {
-      const mh = Math.min(5000, 20000 / w);
-      poorPoints.push(`${xScale(w)},${yScale(mh)}`);
-    }
-    // If the curve reaches top before reaching left, go to top-left and back to start
-    const mhAt03_20k = Math.min(5000, 20000 / 0.3);
-    if (mhAt03_20k < 5000) {
-      poorPoints.push(`${plotLeft},${yScale(mhAt03_20k)}`);
-    }
-
-    // Build polygon for "Fair" — between 20k and 40k hyperbolas
-    const fairPoints: string[] = [];
-    // Walk 20k curve left to right
-    for (let w = 0.3; w <= 15; w += 0.2) {
-      const mh = Math.min(5000, 20000 / w);
-      fairPoints.push(`${xScale(w)},${yScale(mh)}`);
-    }
-    // Walk 40k curve right to left
-    for (let w = 15; w >= 0.3; w -= 0.2) {
-      const mh = Math.min(5000, 40000 / w);
-      fairPoints.push(`${xScale(w)},${yScale(mh)}`);
-    }
-
-    // Build polygon for "Good" — above 40k hyperbola to top of chart
-    const goodPoints: string[] = [];
-    // Walk 40k curve left to right
-    for (let w = 0.3; w <= 15; w += 0.2) {
-      const mh = Math.min(5000, 40000 / w);
-      goodPoints.push(`${xScale(w)},${yScale(mh)}`);
-    }
-    goodPoints.push(`${plotRight},${plotTop}`); // top-right
-    goodPoints.push(`${plotLeft},${plotTop}`); // top-left
-    // Close polygon: the 40k curve at w=0.3 might already be at 5000
-    const mhAt03_40k = Math.min(5000, 40000 / 0.3);
-    if (mhAt03_40k >= 5000) {
-      // Already at top, polygon closes naturally
-    } else {
-      goodPoints.push(`${plotLeft},${yScale(mhAt03_40k)}`);
-    }
+    const xLeft = margin.left;
+    const xRight = width - margin.right;
+    const yTop = margin.top;
+    const yBottom = height - margin.bottom;
+    const plotWidth = xRight - xLeft;
+    const plotHeight = yBottom - yTop;
 
     return (
       <g>
-        <polygon points={poorPoints.join(' ')} fill="#FF9999" fillOpacity={0.25} />
-        <polygon points={fairPoints.join(' ')} fill="#FFFF99" fillOpacity={0.25} />
-        <polygon points={goodPoints.join(' ')} fill="#99FF99" fillOpacity={0.25} />
-        {/* Hyperbola boundary lines */}
-        <polyline points={makeHyperbolaPath(20000)} fill="none" stroke="#CC6666" strokeWidth={1.5} strokeDasharray="4 2" />
-        <polyline points={makeHyperbolaPath(40000)} fill="none" stroke="#66AA66" strokeWidth={1.5} strokeDasharray="4 2" />
+        {/* Good zone background (top right) */}
+        <rect x={xLeft} y={yTop} width={plotWidth} height={plotHeight} fill="#99FF99" fillOpacity={0.15} />
+        {/* Fair zone (middle) */}
+        <path 
+          d={`M ${xLeft},${yBottom} L ${xRight},${yBottom} L ${xRight},${yTop + plotHeight * 0.4} L ${xLeft},${yBottom - plotHeight * 0.4} Z`} 
+          fill="#FFFF99" fillOpacity={0.3} 
+        />
+        {/* Poor zone (bottom left) */}
+        <path 
+          d={`M ${xLeft},${yBottom} L ${xRight},${yBottom} L ${xRight},${yBottom - plotHeight * 0.2} L ${xLeft},${yBottom - plotHeight * 0.1} Z`} 
+          fill="#FF9999" fillOpacity={0.3} 
+        />
+        
         {/* Labels */}
-        <text x={xScale(12)} y={yScale(800)} fontSize={10} fill="#CC3333" fontWeight="bold">Poor</text>
-        <text x={xScale(10)} y={yScale(2800)} fontSize={10} fill="#999933" fontWeight="bold">Fair</text>
-        <text x={xScale(3)} y={yScale(4500)} fontSize={10} fill="#339933" fontWeight="bold">Good</text>
+        <text x={xRight - 40} y={yBottom - 20} fontSize={10} fill="#CC3333" fontWeight="bold" textAnchor="end">Poor</text>
+        <text x={xRight - 40} y={yTop + plotHeight/2} fontSize={10} fill="#999933" fontWeight="bold" textAnchor="end">Fair</text>
+        <text x={xLeft + 40} y={yTop + 20} fontSize={10} fill="#339933" fontWeight="bold">Good</text>
       </g>
     );
   };
@@ -326,8 +286,18 @@ export default function PermitsPage() {
       {/* Stats Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         {[
-          { label: 'Total Permits', value: formatNumber(stats.total), icon: FileText },
-          { label: 'Total Acres', value: formatNumber(Math.round(stats.totalAcres)), icon: MapPin },
+          { 
+            label: 'Total Permits', 
+            value: formatNumber(stats.total), 
+            icon: FileText,
+            breakdown: `${currentYear}: ${formatNumber(stats.currentYearTotal)} | ${prevYear}: ${formatNumber(stats.prevYearTotal)}`
+          },
+          { 
+            label: 'Total Acres', 
+            value: formatNumber(Math.round(stats.totalAcres)), 
+            icon: MapPin,
+            breakdown: `${currentYear}: ${formatNumber(Math.round(stats.currentYearAcres))} | ${prevYear}: ${formatNumber(Math.round(stats.prevYearAcres))}`
+          },
           { label: "Today's Permits", value: formatNumber(stats.todayCount), icon: FileText },
           { label: "Today's Acres", value: formatNumber(Math.round(stats.todayAcres)), icon: MapPin },
           { label: 'Avg VI (Today)', value: formatNumber(Math.round(stats.avgVI)), icon: AlertTriangle },
@@ -338,9 +308,12 @@ export default function PermitsPage() {
               <CardContent className="p-3">
                 <div className="flex items-center gap-2 mb-1">
                   <Icon className="h-3 w-3 text-slate-400" />
-                  <span className="text-[10px] text-slate-500">{s.label}</span>
+                  <span className="text-[10px] text-slate-500 font-bold uppercase tracking-tight">{s.label}</span>
                 </div>
-                <p className="text-lg font-bold text-slate-900">{s.value}</p>
+                <p className="text-lg font-bold text-slate-900 leading-tight">{s.value}</p>
+                {s.breakdown && (
+                  <p className="text-[9px] text-slate-400 mt-1 font-medium border-t pt-1 border-slate-100">{s.breakdown}</p>
+                )}
               </CardContent>
             </Card>
           );
@@ -414,7 +387,7 @@ export default function PermitsPage() {
                     tick={{ fontSize: 11 }}
                     label={{ value: 'Mixing Height (ft)', angle: -90, position: 'insideLeft', fontSize: 11, offset: -10 }}
                   />
-                  <ZAxis dataKey="acres" range={[40, 400]} name="Acres" />
+                  <ZAxis dataKey="acres" range={[100, 1000]} name="Acres" />
                   <Tooltip
                     content={({ active, payload }) => {
                       if (!active || !payload?.[0]) return null;
@@ -431,7 +404,11 @@ export default function PermitsPage() {
                       );
                     }}
                   />
-                  <Scatter data={smokeRiskData}>
+                  <Scatter 
+                    data={smokeRiskData} 
+                    fillOpacity={0.8}
+                    label={{ dataKey: 'county', fill: '#475569', fontSize: 9, offset: 8, position: 'top' }}
+                  >
                     {smokeRiskData.map((entry, i) => (
                       <Cell key={i} fill={PERMIT_DISPERSION_COLORS[entry.quality] || '#999'} stroke="#333" strokeWidth={1} />
                     ))}
@@ -442,9 +419,9 @@ export default function PermitsPage() {
               <p className="text-sm text-slate-400 text-center py-8">No permit data with met data available for today.</p>
             )}
             <div className="flex items-center gap-4 text-xs text-slate-500 mt-2">
-              <span><span className="inline-block w-3 h-3 rounded" style={{ background: '#FF9999' }} /> Poor (VI &lt; 20k)</span>
-              <span><span className="inline-block w-3 h-3 rounded" style={{ background: '#FFFF99' }} /> Fair (20k-40k)</span>
-              <span><span className="inline-block w-3 h-3 rounded" style={{ background: '#99FF99' }} /> Good (VI &gt; 40k)</span>
+              <span><span className="inline-block w-3 h-3 rounded" style={{ background: '#ef4444' }} /> Poor (VI &lt; 20k)</span>
+              <span><span className="inline-block w-3 h-3 rounded" style={{ background: '#eab308' }} /> Fair (20k-40k)</span>
+              <span><span className="inline-block w-3 h-3 rounded" style={{ background: '#22c55e' }} /> Good (VI &gt; 40k)</span>
             </div>
           </CardContent>
         </Card>
@@ -464,9 +441,9 @@ export default function PermitsPage() {
             <p className="text-sm text-slate-400 text-center py-8">No permit data available for today.</p>
           )}
           <div className="flex items-center gap-4 text-xs text-slate-500 mt-2">
-            <span><span className="inline-block w-3 h-3 rounded" style={{ background: '#FF9999' }} /> Poor (Trapping)</span>
-            <span><span className="inline-block w-3 h-3 rounded" style={{ background: '#FFFF99' }} /> Fair</span>
-            <span><span className="inline-block w-3 h-3 rounded" style={{ background: '#99FF99' }} /> Good (Clearing)</span>
+            <span><span className="inline-block w-3 h-3 rounded" style={{ background: '#ef4444' }} /> Poor (Trapping)</span>
+            <span><span className="inline-block w-3 h-3 rounded" style={{ background: '#eab308' }} /> Fair</span>
+            <span><span className="inline-block w-3 h-3 rounded" style={{ background: '#22c55e' }} /> Good (Clearing)</span>
           </div>
         </CardContent>
       </Card>

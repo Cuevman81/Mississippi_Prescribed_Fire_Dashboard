@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { useDashboard } from '@/lib/dashboard-context';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -16,7 +16,7 @@ export default function BurnWindowsPage() {
   } | null>(null);
 
   // Helper: get local hour from ISO time string using the forecast timezone
-  const getLocalHour = (isoTime: string): number => {
+  const getLocalHour = useCallback((isoTime: string): number => {
     const d = new Date(isoTime);
     const localStr = d.toLocaleString('en-US', {
       timeZone: timezone,
@@ -24,16 +24,16 @@ export default function BurnWindowsPage() {
       hour12: false,
     });
     return parseInt(localStr);
-  };
+  }, [timezone]);
 
-  const getLocalDateLabel = (isoTime: string): string => {
+  const getLocalDateLabel = useCallback((isoTime: string): string => {
     return new Date(isoTime).toLocaleDateString('en-US', {
       timeZone: timezone,
       weekday: 'short',
       month: 'short',
       day: 'numeric',
     });
-  };
+  }, [timezone]);
 
   // Only consider future forecast hours (from current time forward)
   const futureForecast = useMemo(
@@ -91,7 +91,7 @@ export default function BurnWindowsPage() {
     }
 
     return windows;
-  }, [futureForecast, prescription, timezone]);
+  }, [futureForecast, prescription, timezone, getLocalDateLabel, getLocalHour]);
 
   // Build heatmap grid data: days (rows) × hours (columns)
   const { days, heatmapGrid } = useMemo(() => {
@@ -122,7 +122,7 @@ export default function BurnWindowsPage() {
     }
 
     return { days: dayOrder, heatmapGrid: grid };
-  }, [futureForecast, timezone, prescription]);
+  }, [futureForecast, prescription, getLocalDateLabel, getLocalHour]);
 
   if (isLoading) {
     return (

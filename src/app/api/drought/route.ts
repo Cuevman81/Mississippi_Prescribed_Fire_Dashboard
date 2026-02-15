@@ -52,8 +52,13 @@ export async function GET() {
       }),
     };
 
-    cachedData = { data: processed, timestamp: Date.now() };
-    return NextResponse.json(processed);
+    const dataWithMeta = {
+      ...processed,
+      lastUpdated: new Date().toISOString(),
+    };
+
+    cachedData = { data: dataWithMeta, timestamp: Date.now() };
+    return NextResponse.json(dataWithMeta);
   } catch (err) {
     console.error('Drought API error:', err);
     return NextResponse.json({ error: 'Drought data service unavailable' }, { status: 500 });

@@ -248,7 +248,16 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
 
         setForecast(hourlyData);
 
-        const narr = (weatherData.narrativePeriods || []).map((p: any) => ({
+        const narr = (weatherData.narrativeForecast?.periods || weatherData.narrativePeriods || []).map((p: {
+          name: string;
+          detailedForecast: string;
+          shortForecast: string;
+          temperature: number;
+          temperatureUnit: string;
+          windSpeed: string;
+          windDirection: string;
+          isDaytime: boolean;
+        }) => ({
           name: p.name,
           detailedForecast: p.detailedForecast,
           shortForecast: p.shortForecast,

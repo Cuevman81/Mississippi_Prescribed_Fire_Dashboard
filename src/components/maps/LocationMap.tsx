@@ -1,6 +1,6 @@
 'use client';
 
-import { MapContainer, TileLayer, Marker, Popup, useMapEvents, CircleMarker } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useDashboard } from '@/lib/dashboard-context';
@@ -38,7 +38,7 @@ function MapEvents() {
 }
 
 export default function LocationMap() {
-  const { location, stationObservation, aqiMonitors } = useDashboard();
+  const { location, stationObservation } = useDashboard();
 
   if (!location) return null;
 
