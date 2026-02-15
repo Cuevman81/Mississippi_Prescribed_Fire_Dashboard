@@ -25,38 +25,18 @@ A comprehensive web-based decision support tool for prescribed fire managers, pr
 ### 4. Field Readiness
 *   **Printable Burn Plan:** Generate a clean, one-page operational summary containing current forecasts, prescription criteria, and 12-hour outlooks designed for field use.
 
-## 🛠 Technical Stack
+## 🔗 Quick Access
+
+The dashboard is fully hosted and ready for use at:  
+**[https://mississippi-prescribed-fire-dashboa.vercel.app/](https://mississippi-prescribed-fire-dashboa.vercel.app/)**
+
+No installation or technical setup is required for end users. Simply open the link in any modern web browser.
+
+## 🛠 Technical Stack (For Developers)
 
 *   **Framework:** [Next.js 15+](https://nextjs.org/) (React 19)
-*   **Styling:** Tailwind CSS with Material Design principles
 *   **Mapping:** Leaflet & React-Leaflet
-*   **Charts:** Recharts
-*   **Data Sources:** 
-    *   National Weather Service (NWS) API
-    *   EPA AirNow API
-    *   NOAA Hazard Mapping System
-    *   U.S. Drought Monitor
-    *   Mississippi Forestry Commission
-
-## 🏁 Getting Started
-
-### Installation
-
-```bash
-# Clone the repository
-git clone https://github.com/Cuevman81/Mississippi_Prescribed_Fire_Dashboard.git
-
-# Install dependencies
-npm install
-```
-
-### Running Locally
-
-```bash
-# Start development server
-npm run dev
-```
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+*   **Data Sources:** NWS API, EPA AirNow, NOAA HMS, U.S. Drought Monitor, MFC.
 
 ## 📄 Disclaimer
 This dashboard is a decision-support tool only. All burn decisions must be made by qualified prescribed fire managers using current field conditions. Always verify conditions on-site before ignition.
