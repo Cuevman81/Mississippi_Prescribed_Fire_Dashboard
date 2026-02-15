@@ -9,11 +9,7 @@ import dynamic from 'next/dynamic';
 const DroughtMap = dynamic(() => import('@/components/maps/DroughtMap'), { ssr: false });
 
 export default function DroughtPage() {
-  const [droughtData, setDroughtData] = useState<{
-    type: string;
-    features: unknown[];
-    lastUpdated?: string;
-  } | null>(null);
+  const [droughtData, setDroughtData] = useState<(GeoJSON.FeatureCollection & { lastUpdated?: string }) | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
