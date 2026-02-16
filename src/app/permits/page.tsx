@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Loader2, FileText, MapPin, AlertTriangle, Radio } from 'lucide-react';
 import type { MFCPermit } from '@/lib/types';
 import { formatNumber } from '@/lib/weather-utils';
+import { getTodayStr } from '@/lib/utils';
 import { PERMIT_DISPERSION_COLORS } from '@/lib/constants';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer,
@@ -57,7 +58,7 @@ export default function PermitsPage() {
 
   const currentYear = new Date().getFullYear();
   const prevYear = currentYear - 1;
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getTodayStr();
 
   // Date range filtering
   const filteredPermits = useMemo(() => {
