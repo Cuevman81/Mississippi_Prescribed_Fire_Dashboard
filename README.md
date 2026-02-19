@@ -42,4 +42,4 @@ No installation or technical setup is required for end users. Simply open the li
 This dashboard is a decision-support tool only. All burn decisions must be made by qualified prescribed fire managers using current field conditions. Always verify conditions on-site before ignition.
 
 ---
-*Developed for the Mississippi Department of Environmental Quality (MDEQ)*
+*Developed by Rodney Cuevas, RCuevas@mdeq.ms.gov for the Mississippi Department of Environmental Quality (MDEQ)*
