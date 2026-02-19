@@ -509,15 +509,15 @@ export default function PermitsPage() {
                   <Legend wrapperStyle={{ fontSize: 11 }} formatter={(v) => `Certified Manager: ${v}`} />
                   <Bar dataKey="Yes" stackId="a" fill="#228B22" name="Yes">
                     <LabelList dataKey="Yes" position="inside" style={{ fill: '#fff', fontSize: 10, fontWeight: 600 }}
-                      formatter={(v: number | undefined) => (v ?? 0) > 0 ? v : ''} />
+                      formatter={(v: string | number | null | undefined) => typeof v === 'number' && v > 0 ? v : ''} />
                   </Bar>
                   <Bar dataKey="No" stackId="a" fill="#CD5C5C" name="No">
                     <LabelList dataKey="No" position="inside" style={{ fill: '#fff', fontSize: 10, fontWeight: 600 }}
-                      formatter={(v: number | undefined) => (v ?? 0) > 0 ? v : ''} />
+                      formatter={(v: string | number | null | undefined) => typeof v === 'number' && v > 0 ? v : ''} />
                   </Bar>
                   <Bar dataKey="Unknown" stackId="a" fill="#808080" name="Unknown" radius={[0, 3, 3, 0]}>
                     <LabelList dataKey="Unknown" position="inside" style={{ fill: '#fff', fontSize: 10, fontWeight: 600 }}
-                      formatter={(v: number | undefined) => (v ?? 0) > 0 ? v : ''} />
+                      formatter={(v: string | number | null | undefined) => typeof v === 'number' && v > 0 ? v : ''} />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
