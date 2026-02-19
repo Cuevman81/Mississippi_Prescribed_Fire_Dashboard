@@ -191,6 +191,8 @@ export interface MFCPermit {
   windDeg: number | null;
   year: number;
   burnPurpose?: string;
+  burnType?: string;
+  certBurnManager?: string;
 }
 
 export interface PermitStats {

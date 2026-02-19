@@ -95,6 +95,8 @@ export async function GET() {
         windDeg: windDegMap[windDir.toUpperCase()] ?? null,
         year,
         burnPurpose: attrs.burn_purpose ? String(attrs.burn_purpose) : undefined,
+        burnType: attrs.burn_type ? String(attrs.burn_type) : undefined,
+        certBurnManager: attrs.cert_burn_manager ? String(attrs.cert_burn_manager) : undefined,
       };
     }).filter((p: { year: number }) => p.year > 0);
 

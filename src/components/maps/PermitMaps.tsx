@@ -62,16 +62,7 @@ export default function PermitMaps({ permits, type }: Props) {
         let strokeColor = '#991b1b';
 
         if (type === 'dispersion') {
-          const qual = (p.dispersionQuality || '').toLowerCase();
-          if (qual.includes('good')) {
-            fillColor = '#22c55e'; // Vibrant Green
-          } else if (qual.includes('fair')) {
-            fillColor = '#eab308'; // Vibrant Yellow
-          } else if (qual.includes('poor')) {
-            fillColor = '#ef4444'; // Vibrant Red
-          } else {
-            fillColor = '#94a3b8'; // Grey for unknown
-          }
+          fillColor = PERMIT_DISPERSION_COLORS[p.dispersionQuality] || '#94a3b8';
           strokeColor = '#1e293b';
         }
 
