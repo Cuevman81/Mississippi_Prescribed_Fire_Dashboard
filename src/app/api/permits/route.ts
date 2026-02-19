@@ -97,6 +97,8 @@ export async function GET() {
         burnPurpose: attrs.burn_purpose ? String(attrs.burn_purpose) : undefined,
         burnType: attrs.burn_type ? String(attrs.burn_type) : undefined,
         certBurnManager: attrs.cert_burn_manager ? String(attrs.cert_burn_manager) : undefined,
+        burnPermitId: attrs.burn_permit_id ? String(attrs.burn_permit_id) : undefined,
+        dayNight: attrs.day_night ? String(attrs.day_night) : undefined,
       };
     }).filter((p: { year: number }) => p.year > 0);
 

@@ -193,6 +193,8 @@ export interface MFCPermit {
   burnPurpose?: string;
   burnType?: string;
   certBurnManager?: string;
+  burnPermitId?: string;
+  dayNight?: string;
 }
 
 export interface PermitStats {

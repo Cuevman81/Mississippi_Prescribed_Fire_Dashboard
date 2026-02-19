@@ -609,8 +609,8 @@ export default function PermitsPage() {
             <table className="w-full text-xs">
               <thead className="sticky top-0 bg-white z-10">
                 <tr className="border-b bg-slate-50">
-                  {['Date', 'County', 'Acres', 'Wind Dir', 'Wind Spd', 'Mix Ht', 'VI', 'Quality', 'Source'].map((h) => (
-                    <th key={h} className="px-2 py-2 text-left font-medium text-slate-500">{h}</th>
+                  {['Permit ID', 'Date', 'County', 'Type / Purpose', 'D/N', 'Mgr', 'Acres', 'Wind Dir', 'Wind Spd', 'Mix Ht', 'VI', 'Quality', 'Source'].map((h) => (
+                    <th key={h} className="px-2 py-2 text-left font-medium text-slate-500 whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -619,8 +619,28 @@ export default function PermitsPage() {
                   const isLive = p.permitDate === todayStr && liveWeather[p.county];
                   return (
                     <tr key={i} className="border-b hover:bg-slate-50">
-                      <td className="px-2 py-1.5">{p.permitDate}</td>
-                      <td className="px-2 py-1.5 font-medium">{p.county}</td>
+                      <td className="px-2 py-1.5 font-mono text-[10px] text-slate-500 whitespace-nowrap">{p.burnPermitId || '—'}</td>
+                      <td className="px-2 py-1.5 whitespace-nowrap">{p.permitDate}</td>
+                      <td className="px-2 py-1.5 font-medium whitespace-nowrap">{p.county}</td>
+                      <td className="px-2 py-1.5 whitespace-nowrap">
+                        {[p.burnType, p.burnPurpose].filter(Boolean).join(' / ') || '—'}
+                      </td>
+                      <td className="px-2 py-1.5 text-center">
+                        {p.dayNight ? (
+                          <span className={`px-1 py-0.5 rounded text-[10px] font-medium ${p.dayNight === 'Day' ? 'bg-amber-100 text-amber-800' : 'bg-slate-200 text-slate-700'}`}>
+                            {p.dayNight}
+                          </span>
+                        ) : '—'}
+                      </td>
+                      <td className="px-2 py-1.5 text-center">
+                        {p.certBurnManager ? (
+                          <span className={`px-1 py-0.5 rounded text-[10px] font-medium ${
+                            p.certBurnManager === 'Yes' ? 'bg-green-100 text-green-800' :
+                            p.certBurnManager === 'No' ? 'bg-red-100 text-red-800' :
+                            'bg-slate-100 text-slate-600'
+                          }`}>{p.certBurnManager}</span>
+                        ) : '—'}
+                      </td>
                       <td className="px-2 py-1.5">{p.burnAcresEstimate}</td>
                       <td className="px-2 py-1.5">{p.windDirection}</td>
                       <td className="px-2 py-1.5">{p.windSpeed}</td>
@@ -628,7 +648,7 @@ export default function PermitsPage() {
                       <td className="px-2 py-1.5">{formatNumber(p.ventilationIndex)}</td>
                       <td className="px-2 py-1.5">
                         <span
-                          className="px-1.5 py-0.5 rounded text-[10px] font-medium"
+                          className="px-1.5 py-0.5 rounded text-[10px] font-medium whitespace-nowrap"
                           style={{
                             backgroundColor: PERMIT_DISPERSION_COLORS[p.dispersionQuality] || '#eee',
                             color: p.dispersionQuality === 'Fair' ? '#854d0e' : (PERMIT_DISPERSION_COLORS[p.dispersionQuality] ? 'white' : '#555'),
