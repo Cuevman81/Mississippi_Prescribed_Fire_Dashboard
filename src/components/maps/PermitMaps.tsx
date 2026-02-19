@@ -62,16 +62,7 @@ export default function PermitMaps({ permits, type }: Props) {
         let strokeColor = '#991b1b';
 
         if (type === 'dispersion') {
-          const qual = (p.dispersionQuality || '').toLowerCase();
-          if (qual.includes('good')) {
-            fillColor = '#22c55e'; // Vibrant Green
-          } else if (qual.includes('fair')) {
-            fillColor = '#eab308'; // Vibrant Yellow
-          } else if (qual.includes('poor')) {
-            fillColor = '#ef4444'; // Vibrant Red
-          } else {
-            fillColor = '#94a3b8'; // Grey for unknown
-          }
+          fillColor = PERMIT_DISPERSION_COLORS[p.dispersionQuality] || '#94a3b8';
           strokeColor = '#1e293b';
         }
 
@@ -176,14 +167,20 @@ function WindArrowMarker({
 
 /** Shared popup content */
 function PermitPopup({ permit: p }: { permit: MFCPermit }) {
+  const typePurpose = [p.burnType, p.burnPurpose].filter(Boolean).join(' / ');
   return (
-    <div className="text-xs">
-      <p className="font-bold">{p.county}</p>
-      <p>Acres: {p.burnAcresEstimate}</p>
-      <p>Wind: {p.windDirection} @ {p.windSpeed} mph</p>
-      <p>Mix Height: {p.mixingHeight} ft</p>
-      <p>VI: {p.ventilationIndex.toLocaleString()}</p>
-      <p className="font-medium">{p.dispersionQuality}</p>
+    <div className="text-xs min-w-[160px]">
+      <p className="font-bold text-sm">{p.county} Co.</p>
+      {p.burnPermitId && <p className="text-slate-500 font-mono">{p.burnPermitId}</p>}
+      {typePurpose && <p><span className="text-slate-500">Type:</span> {typePurpose}</p>}
+      <p><span className="text-slate-500">Acres:</span> {p.burnAcresEstimate}</p>
+      {p.dayNight && <p><span className="text-slate-500">Burn:</span> {p.dayNight}</p>}
+      {p.certBurnManager && <p><span className="text-slate-500">Cert. Mgr:</span> {p.certBurnManager}</p>}
+      <hr className="my-1 border-slate-200" />
+      <p><span className="text-slate-500">Wind:</span> {p.windDirection} @ {p.windSpeed} mph</p>
+      <p><span className="text-slate-500">Mix Ht:</span> {p.mixingHeight} ft</p>
+      <p><span className="text-slate-500">VI:</span> {p.ventilationIndex.toLocaleString()}</p>
+      <p className="font-semibold mt-1">{p.dispersionQuality}</p>
     </div>
   );
 }

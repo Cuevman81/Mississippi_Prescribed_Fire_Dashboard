@@ -11,7 +11,7 @@ import { getTodayStr } from '@/lib/utils';
 import { PERMIT_DISPERSION_COLORS } from '@/lib/constants';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer,
-  ScatterChart, Scatter, Cell, ZAxis, Customized,
+  ScatterChart, Scatter, Cell, ZAxis, Customized, LabelList,
 } from 'recharts';
 import dynamic from 'next/dynamic';
 
@@ -182,12 +182,15 @@ export default function PermitsPage() {
     const prevYearTotal = permits.filter(p => p.year === prevYear).length;
     const prevYearAcres = permits.filter(p => p.year === prevYear).reduce((s, p) => s + (p.burnAcresEstimate || 0), 0);
 
-    return { 
-      total: permits.length, 
-      totalAcres: permits.reduce((s, p) => s + (p.burnAcresEstimate || 0), 0), 
-      todayCount, 
-      todayAcres, 
+    const todayCounties = new Set(ep.map(p => p.county)).size;
+
+    return {
+      total: permits.length,
+      totalAcres: permits.reduce((s, p) => s + (p.burnAcresEstimate || 0), 0),
+      todayCount,
+      todayAcres,
       avgVI,
+      todayCounties,
       currentYearTotal,
       currentYearAcres,
       prevYearTotal,
@@ -214,20 +217,56 @@ export default function PermitsPage() {
       .slice(0, 10);
   }, [permits, currentYear, prevYear]);
 
-  // Smoke risk scatter data (from enriched today permits)
-  const smokeRiskData = useMemo(() =>
-    enrichedTodayPermits
-      .filter((p) => p.windSpeed > 0 && p.mixingHeight > 0)
-      .map((p) => ({
-        windSpeed: p.windSpeed,
-        mixingHeight: p.mixingHeight,
-        acres: p.burnAcresEstimate,
-        county: p.county,
-        vi: p.ventilationIndex,
-        quality: p.dispersionQuality,
-      })),
-    [enrichedTodayPermits]
-  );
+  // Smoke risk scatter data — aggregated per county to avoid overlap
+  // (all permits in a county share the same county-level met data)
+  const smokeRiskData = useMemo(() => {
+    const countyMap = new Map<string, {
+      windSpeed: number; mixingHeight: number; acres: number;
+      count: number; vi: number; quality: string; county: string;
+    }>();
+    for (const p of enrichedTodayPermits) {
+      if (!p.windSpeed || !p.mixingHeight) continue;
+      if (!countyMap.has(p.county)) {
+        countyMap.set(p.county, {
+          windSpeed: p.windSpeed,
+          mixingHeight: p.mixingHeight,
+          acres: 0,
+          count: 0,
+          vi: p.ventilationIndex,
+          quality: p.dispersionQuality,
+          county: p.county,
+        });
+      }
+      const entry = countyMap.get(p.county)!;
+      entry.acres += p.burnAcresEstimate || 0;
+      entry.count += 1;
+    }
+    return [...countyMap.values()];
+  }, [enrichedTodayPermits]);
+
+  // Daily permit profile data — grouped by burn type/purpose & manager certification
+  const permitProfileData = useMemo(() => {
+    const groups = new Map<string, { Yes: number; No: number; Unknown: number; total: number }>();
+    for (const p of enrichedTodayPermits) {
+      const typePart = p.burnType || '';
+      const purposePart = p.burnPurpose || '';
+      const label = typePart && purposePart
+        ? `${typePart} (${purposePart})`
+        : typePart || purposePart || 'Unspecified';
+      if (!groups.has(label)) {
+        groups.set(label, { Yes: 0, No: 0, Unknown: 0, total: 0 });
+      }
+      const g = groups.get(label)!;
+      const mgr = (p.certBurnManager || '').trim();
+      if (mgr === 'Yes') g.Yes++;
+      else if (mgr === 'No') g.No++;
+      else g.Unknown++;
+      g.total++;
+    }
+    return [...groups.entries()]
+      .map(([label, counts]) => ({ label, ...counts }))
+      .sort((a, b) => a.total - b.total); // ascending so top bar = highest
+  }, [enrichedTodayPermits]);
 
   // simplified risk zone renderer for Recharts Customized component
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -299,7 +338,12 @@ export default function PermitsPage() {
             icon: MapPin,
             breakdown: `${currentYear}: ${formatNumber(Math.round(stats.currentYearAcres))} | ${prevYear}: ${formatNumber(Math.round(stats.prevYearAcres))}`
           },
-          { label: "Today's Permits", value: formatNumber(stats.todayCount), icon: FileText },
+          {
+            label: "Today's Permits",
+            value: formatNumber(stats.todayCount),
+            icon: FileText,
+            breakdown: stats.todayCounties > 0 ? `${stats.todayCounties} ${stats.todayCounties === 1 ? 'county' : 'counties'}` : undefined,
+          },
           { label: "Today's Acres", value: formatNumber(Math.round(stats.todayAcres)), icon: MapPin },
           { label: 'Avg VI (Today)', value: formatNumber(Math.round(stats.avgVI)), icon: AlertTriangle },
         ].map((s, i) => {
@@ -324,8 +368,15 @@ export default function PermitsPage() {
       {/* Live weather indicator */}
       {Object.keys(liveWeather).length > 0 && (
         <div className="flex items-center gap-2 text-xs text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
-          <Radio className="h-3 w-3 animate-pulse" />
-          <span>Today&apos;s permits enriched with <strong>live NWS weather data</strong> for {Object.keys(liveWeather).length} counties</span>
+          <Radio className="h-3 w-3 animate-pulse flex-shrink-0" />
+          <span>
+            Today&apos;s permits enriched with <strong>live NWS weather data</strong> for{' '}
+            {(() => {
+              const counties = Object.keys(liveWeather);
+              const shown = counties.slice(0, 5).join(', ');
+              return counties.length > 5 ? `${shown} +${counties.length - 5} more` : shown;
+            })()}
+          </span>
         </div>
       )}
       {weatherLoading && (
@@ -396,19 +447,23 @@ export default function PermitsPage() {
                       return (
                         <div className="bg-white border rounded-lg shadow-lg p-2 text-xs">
                           <p className="font-bold">{d.county}</p>
+                          <p>Permits: {d.count}</p>
+                          <p>Total Acres: {formatNumber(Math.round(d.acres))}</p>
                           <p>Wind: {d.windSpeed} mph</p>
-                          <p>Mix Height: {d.mixingHeight} ft</p>
+                          <p>Mix Height: {formatNumber(d.mixingHeight)} ft</p>
                           <p>VI: {formatNumber(d.vi)}</p>
-                          <p>Acres: {d.acres}</p>
                           <p className="font-medium">{d.quality}</p>
                         </div>
                       );
                     }}
                   />
-                  <Scatter 
-                    data={smokeRiskData} 
-                    fillOpacity={0.8}
-                    label={{ dataKey: 'county', fill: '#475569', fontSize: 9, offset: 8, position: 'top' }}
+                  <Scatter
+                    data={smokeRiskData}
+                    fillOpacity={0.85}
+                    label={smokeRiskData.length <= 12
+                      ? { dataKey: 'county', fill: '#475569', fontSize: 9, offset: 8, position: 'top' }
+                      : undefined
+                    }
                   >
                     {smokeRiskData.map((entry, i) => (
                       <Cell key={i} fill={PERMIT_DISPERSION_COLORS[entry.quality] || '#999'} stroke="#333" strokeWidth={1} />
@@ -419,14 +474,60 @@ export default function PermitsPage() {
             ) : (
               <p className="text-sm text-slate-400 text-center py-8">No permit data with met data available for today.</p>
             )}
-            <div className="flex items-center gap-4 text-xs text-slate-500 mt-2">
+            <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500 mt-2">
               <span><span className="inline-block w-3 h-3 rounded" style={{ background: '#ef4444' }} /> Poor (VI &lt; 20k)</span>
-              <span><span className="inline-block w-3 h-3 rounded" style={{ background: '#eab308' }} /> Fair (20k-40k)</span>
+              <span><span className="inline-block w-3 h-3 rounded" style={{ background: '#eab308' }} /> Fair (20k–40k)</span>
               <span><span className="inline-block w-3 h-3 rounded" style={{ background: '#22c55e' }} /> Good (VI &gt; 40k)</span>
+              <span className="text-slate-400 italic">One point per county · bubble size = total acres</span>
             </div>
           </CardContent>
         </Card>
       </div>
+
+      {/* Daily Permit Profile */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm font-medium text-slate-500">
+            Daily Permit Profile (Today)
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {permitProfileData.length > 0 ? (
+            <>
+              <ResponsiveContainer width="100%" height={Math.max(180, permitProfileData.length * 44)}>
+                <BarChart
+                  data={permitProfileData}
+                  layout="vertical"
+                  margin={{ top: 4, right: 40, bottom: 4, left: 160 }}
+                >
+                  <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} label={{ value: 'Number of Permits', position: 'insideBottom', offset: -2, fontSize: 11 }} />
+                  <YAxis dataKey="label" type="category" tick={{ fontSize: 11 }} width={155} />
+                  <Tooltip
+                    formatter={(value: number | undefined, name: string) => [value ?? 0, `Manager: ${name}`]}
+                    contentStyle={{ fontSize: 12 }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: 11 }} formatter={(v) => `Certified Manager: ${v}`} />
+                  <Bar dataKey="Yes" stackId="a" fill="#228B22" name="Yes">
+                    <LabelList dataKey="Yes" position="inside" style={{ fill: '#fff', fontSize: 10, fontWeight: 600 }}
+                      formatter={(v: number | undefined) => (v ?? 0) > 0 ? v : ''} />
+                  </Bar>
+                  <Bar dataKey="No" stackId="a" fill="#CD5C5C" name="No">
+                    <LabelList dataKey="No" position="inside" style={{ fill: '#fff', fontSize: 10, fontWeight: 600 }}
+                      formatter={(v: number | undefined) => (v ?? 0) > 0 ? v : ''} />
+                  </Bar>
+                  <Bar dataKey="Unknown" stackId="a" fill="#808080" name="Unknown" radius={[0, 3, 3, 0]}>
+                    <LabelList dataKey="Unknown" position="inside" style={{ fill: '#fff', fontSize: 10, fontWeight: 600 }}
+                      formatter={(v: number | undefined) => (v ?? 0) > 0 ? v : ''} />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+              <p className="text-[10px] text-slate-400 mt-1">Stacked by certified burn manager status. Bars ordered by permit count.</p>
+            </>
+          ) : (
+            <p className="text-sm text-slate-400 text-center py-8">No permits for today to display profile.</p>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Dispersion Quality Map */}
       <Card>
@@ -437,7 +538,11 @@ export default function PermitsPage() {
         </CardHeader>
         <CardContent>
           {mapPermits.length > 0 ? (
-            <PermitMaps permits={mapPermits} type="dispersion" />
+            <PermitMaps
+              key={`dispersion-${Object.keys(liveWeather).length}`}
+              permits={mapPermits}
+              type="dispersion"
+            />
           ) : (
             <p className="text-sm text-slate-400 text-center py-8">No permit data available for today.</p>
           )}
@@ -504,8 +609,8 @@ export default function PermitsPage() {
             <table className="w-full text-xs">
               <thead className="sticky top-0 bg-white z-10">
                 <tr className="border-b bg-slate-50">
-                  {['Date', 'County', 'Acres', 'Wind Dir', 'Wind Spd', 'Mix Ht', 'VI', 'Quality', 'Source'].map((h) => (
-                    <th key={h} className="px-2 py-2 text-left font-medium text-slate-500">{h}</th>
+                  {['Permit ID', 'Date', 'County', 'Type / Purpose', 'D/N', 'Mgr', 'Acres', 'Wind Dir', 'Wind Spd', 'Mix Ht', 'VI', 'Quality', 'Source'].map((h) => (
+                    <th key={h} className="px-2 py-2 text-left font-medium text-slate-500 whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -514,8 +619,28 @@ export default function PermitsPage() {
                   const isLive = p.permitDate === todayStr && liveWeather[p.county];
                   return (
                     <tr key={i} className="border-b hover:bg-slate-50">
-                      <td className="px-2 py-1.5">{p.permitDate}</td>
-                      <td className="px-2 py-1.5 font-medium">{p.county}</td>
+                      <td className="px-2 py-1.5 font-mono text-[10px] text-slate-500 whitespace-nowrap">{p.burnPermitId || '—'}</td>
+                      <td className="px-2 py-1.5 whitespace-nowrap">{p.permitDate}</td>
+                      <td className="px-2 py-1.5 font-medium whitespace-nowrap">{p.county}</td>
+                      <td className="px-2 py-1.5 whitespace-nowrap">
+                        {[p.burnType, p.burnPurpose].filter(Boolean).join(' / ') || '—'}
+                      </td>
+                      <td className="px-2 py-1.5 text-center">
+                        {p.dayNight ? (
+                          <span className={`px-1 py-0.5 rounded text-[10px] font-medium ${p.dayNight === 'Day' ? 'bg-amber-100 text-amber-800' : 'bg-slate-200 text-slate-700'}`}>
+                            {p.dayNight}
+                          </span>
+                        ) : '—'}
+                      </td>
+                      <td className="px-2 py-1.5 text-center">
+                        {p.certBurnManager ? (
+                          <span className={`px-1 py-0.5 rounded text-[10px] font-medium ${
+                            p.certBurnManager === 'Yes' ? 'bg-green-100 text-green-800' :
+                            p.certBurnManager === 'No' ? 'bg-red-100 text-red-800' :
+                            'bg-slate-100 text-slate-600'
+                          }`}>{p.certBurnManager}</span>
+                        ) : '—'}
+                      </td>
                       <td className="px-2 py-1.5">{p.burnAcresEstimate}</td>
                       <td className="px-2 py-1.5">{p.windDirection}</td>
                       <td className="px-2 py-1.5">{p.windSpeed}</td>
@@ -523,8 +648,11 @@ export default function PermitsPage() {
                       <td className="px-2 py-1.5">{formatNumber(p.ventilationIndex)}</td>
                       <td className="px-2 py-1.5">
                         <span
-                          className="px-1.5 py-0.5 rounded text-[10px] font-medium"
-                          style={{ backgroundColor: PERMIT_DISPERSION_COLORS[p.dispersionQuality] || '#eee' }}
+                          className="px-1.5 py-0.5 rounded text-[10px] font-medium whitespace-nowrap"
+                          style={{
+                            backgroundColor: PERMIT_DISPERSION_COLORS[p.dispersionQuality] || '#eee',
+                            color: p.dispersionQuality === 'Fair' ? '#854d0e' : (PERMIT_DISPERSION_COLORS[p.dispersionQuality] ? 'white' : '#555'),
+                          }}
                         >
                           {p.dispersionQuality}
                         </span>
