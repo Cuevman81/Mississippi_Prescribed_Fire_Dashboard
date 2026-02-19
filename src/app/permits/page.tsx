@@ -503,7 +503,7 @@ export default function PermitsPage() {
                   <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} label={{ value: 'Number of Permits', position: 'insideBottom', offset: -2, fontSize: 11 }} />
                   <YAxis dataKey="label" type="category" tick={{ fontSize: 11 }} width={155} />
                   <Tooltip
-                    formatter={(value: number | undefined, name: string) => [value ?? 0, `Manager: ${name}`]}
+                    formatter={(value: number | undefined, name: string | undefined) => [value ?? 0, `Manager: ${name ?? ''}`]}
                     contentStyle={{ fontSize: 12 }}
                   />
                   <Legend wrapperStyle={{ fontSize: 11 }} formatter={(v) => `Certified Manager: ${v}`} />
