@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, FileText, MapPin, AlertTriangle, Radio } from 'lucide-react';
+import { Loader2, FileText, MapPin, AlertTriangle, Radio, ArrowUpDown, ChevronUp, ChevronDown } from 'lucide-react';
 import type { MFCPermit } from '@/lib/types';
 import { formatNumber } from '@/lib/weather-utils';
 import { getTodayStr } from '@/lib/utils';
@@ -38,6 +38,7 @@ export default function PermitsPage() {
   const [liveWeather, setLiveWeather] = useState<Record<string, CountyWeather>>({});
   const [weatherLoading, setWeatherLoading] = useState(false);
   const weatherFetchedRef = useRef<string>('');
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
 
   // Fetch permits
   useEffect(() => {
@@ -248,11 +249,17 @@ export default function PermitsPage() {
   const permitProfileData = useMemo(() => {
     const groups = new Map<string, { Yes: number; No: number; Unknown: number; total: number }>();
     for (const p of enrichedTodayPermits) {
-      const typePart = p.burnType || '';
-      const purposePart = p.burnPurpose || '';
-      const label = typePart && purposePart
-        ? `${typePart} (${purposePart})`
-        : typePart || purposePart || 'Unspecified';
+      const typePart = (p.burnType || '').trim();
+      const purposePart = (p.burnPurpose || '').trim();
+      
+      let label = 'Unspecified';
+      if (typePart && purposePart) {
+        // Deduplicate if they are the same
+        label = typePart === purposePart ? typePart : `${typePart} (${purposePart})`;
+      } else {
+        label = typePart || purposePart || 'Unspecified';
+      }
+
       if (!groups.has(label)) {
         groups.set(label, { Yes: 0, No: 0, Unknown: 0, total: 0 });
       }
@@ -310,6 +317,47 @@ export default function PermitsPage() {
     return filteredPermits;
   }, [dateRange, enrichedTodayPermits, filteredPermits]);
 
+  const requestSort = (key: string) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const sortedTablePermits = useMemo(() => {
+    const items = [...tablePermits];
+    if (sortConfig !== null) {
+      items.sort((a, b) => {
+        const key = sortConfig.key as keyof typeof a;
+        let aValue: any = a[key];
+        let bValue: any = b[key];
+
+        // Special handling for derived or combined fields
+        if (sortConfig.key === 'type') {
+          aValue = `${a.burnType} ${a.burnPurpose}`;
+          bValue = `${b.burnType} ${b.burnPurpose}`;
+        }
+        if (sortConfig.key === 'source') {
+          aValue = a.permitDate === todayStr && liveWeather[a.county] ? 'NWS' : 'MFC';
+          bValue = b.permitDate === todayStr && liveWeather[b.county] ? 'NWS' : 'MFC';
+        }
+
+        if (aValue < bValue) {
+          return sortConfig.direction === 'asc' ? -1 : 1;
+        }
+        if (aValue > bValue) {
+          return sortConfig.direction === 'asc' ? 1 : -1;
+        }
+        return 0;
+      });
+    } else {
+      // Default: show newest first if no sort selected
+      items.reverse();
+    }
+    return items;
+  }, [tablePermits, sortConfig, todayStr, liveWeather]);
+
   // For maps: always use enriched today permits
   const mapPermits = enrichedTodayPermits;
 
@@ -366,7 +414,7 @@ export default function PermitsPage() {
       </div>
 
       {/* Live weather indicator */}
-      {Object.keys(liveWeather).length > 0 && (
+      {Object.keys(liveWeather).length > 0 && !weatherLoading && (
         <div className="flex items-center gap-2 text-xs text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
           <Radio className="h-3 w-3 animate-pulse flex-shrink-0" />
           <span>
@@ -380,9 +428,20 @@ export default function PermitsPage() {
         </div>
       )}
       {weatherLoading && (
-        <div className="flex items-center gap-2 text-xs text-slate-500">
-          <Loader2 className="h-3 w-3 animate-spin" /> Fetching live weather for today&apos;s permit counties...
-        </div>
+        <Card className="border-orange-200 bg-orange-50/50 shadow-sm animate-pulse">
+          <CardContent className="flex flex-col items-center justify-center py-6 gap-3">
+            <div className="relative">
+              <Loader2 className="h-10 w-10 animate-spin text-orange-600" />
+              <Radio className="h-4 w-4 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-orange-400" />
+            </div>
+            <div className="text-center">
+              <p className="text-sm font-bold text-orange-900">Fetching Live Weather Data</p>
+              <p className="text-xs text-orange-700/70 mt-1">
+                Gathering real-time NWS dispersion metrics for {todayPermits.length} permit locations...
+              </p>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Top 10 Counties + Scatter Plot side by side */}
@@ -498,10 +557,15 @@ export default function PermitsPage() {
                 <BarChart
                   data={permitProfileData}
                   layout="vertical"
-                  margin={{ top: 4, right: 40, bottom: 4, left: 160 }}
+                  margin={{ top: 4, right: 40, bottom: 4, left: 180 }}
                 >
                   <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} label={{ value: 'Number of Permits', position: 'insideBottom', offset: -2, fontSize: 11 }} />
-                  <YAxis dataKey="label" type="category" tick={{ fontSize: 11 }} width={155} />
+                  <YAxis 
+                    dataKey="label" 
+                    type="category" 
+                    tick={{ fontSize: 10 }} 
+                    width={175}
+                  />
                   <Tooltip
                     formatter={(value: number | undefined, name: string | undefined) => [value ?? 0, `Manager: ${name ?? ''}`]}
                     contentStyle={{ fontSize: 12 }}
@@ -609,13 +673,40 @@ export default function PermitsPage() {
             <table className="w-full text-xs">
               <thead className="sticky top-0 bg-white z-10">
                 <tr className="border-b bg-slate-50">
-                  {['Permit ID', 'Date', 'County', 'Type / Purpose', 'D/N', 'Mgr', 'Acres', 'Wind Dir', 'Wind Spd', 'Mix Ht', 'VI', 'Quality', 'Source'].map((h) => (
-                    <th key={h} className="px-2 py-2 text-left font-medium text-slate-500 whitespace-nowrap">{h}</th>
+                  {[
+                    { label: 'Permit ID', key: 'burnPermitId' },
+                    { label: 'Date', key: 'permitDate' },
+                    { label: 'County', key: 'county' },
+                    { label: 'Type / Purpose', key: 'type' },
+                    { label: 'D/N', key: 'dayNight' },
+                    { label: 'Mgr', key: 'certBurnManager' },
+                    { label: 'Acres', key: 'burnAcresEstimate' },
+                    { label: 'Wind Dir', key: 'windDirection' },
+                    { label: 'Wind Spd', key: 'windSpeed' },
+                    { label: 'Mix Ht', key: 'mixingHeight' },
+                    { label: 'VI', key: 'ventilationIndex' },
+                    { label: 'Quality', key: 'dispersionQuality' },
+                    { label: 'Source', key: 'source' },
+                  ].map((h) => (
+                    <th 
+                      key={h.label} 
+                      className="px-2 py-2 text-left font-medium text-slate-500 whitespace-nowrap cursor-pointer hover:bg-slate-100 transition-colors"
+                      onClick={() => requestSort(h.key)}
+                    >
+                      <div className="flex items-center gap-1">
+                        {h.label}
+                        {sortConfig?.key === h.key ? (
+                          sortConfig.direction === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
+                        ) : (
+                          <ArrowUpDown className="h-3 w-3 text-slate-300" />
+                        )}
+                      </div>
+                    </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {tablePermits.slice(-200).reverse().map((p, i) => {
+                {sortedTablePermits.slice(0, 500).map((p, i) => {
                   const isLive = p.permitDate === todayStr && liveWeather[p.county];
                   return (
                     <tr key={i} className="border-b hover:bg-slate-50">
