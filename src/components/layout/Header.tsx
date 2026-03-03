@@ -58,123 +58,133 @@ export function Header() {
         </div>
       )}
 
-      {/* Prescription parameters toggle */}
-      <Sheet open={showParams} onOpenChange={setShowParams}>
-        <SheetTrigger asChild>
-          <Button variant="outline" size="sm" className="hidden sm:flex">
-            Rx Parameters
-          </Button>
-        </SheetTrigger>
-        <SheetContent className="overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>Prescription Parameters</SheetTitle>
-            <SheetDescription>
-              Set your burn prescription thresholds. These are used to identify optimal burn windows.
-            </SheetDescription>
-          </SheetHeader>
+      {/* Right side controls & Logo */}
+      <div className="ml-auto flex items-center gap-4">
+        {/* Prescription parameters toggle */}
+        <Sheet open={showParams} onOpenChange={setShowParams}>
+          <SheetTrigger asChild>
+            <Button variant="outline" size="sm" className="hidden sm:flex">
+              Rx Parameters
+            </Button>
+          </SheetTrigger>
+          <SheetContent className="overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle>Prescription Parameters</SheetTitle>
+              <SheetDescription>
+                Set your burn prescription thresholds. These are used to identify optimal burn windows.
+              </SheetDescription>
+            </SheetHeader>
 
-          <div className="space-y-6 pt-4">
-            <div className="space-y-2">
-              <Label className="text-xs font-bold uppercase text-slate-400">Quick Presets</Label>
-              <div className="grid grid-cols-2 gap-2">
-                {Object.entries(PRESCRIPTION_PRESETS).map(([name, params]) => (
-                  <Button
-                    key={name}
-                    variant="outline"
-                    size="sm"
-                    className="text-[10px] h-auto py-2 px-1 justify-start text-left block overflow-hidden text-ellipsis whitespace-nowrap"
-                    onClick={() => setPrescription(params)}
-                  >
-                    {name}
-                  </Button>
-                ))}
+            <div className="space-y-6 pt-4">
+              <div className="space-y-2">
+                <Label className="text-xs font-bold uppercase text-slate-400">Quick Presets</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {Object.entries(PRESCRIPTION_PRESETS).map(([name, params]) => (
+                    <Button
+                      key={name}
+                      variant="outline"
+                      size="sm"
+                      className="text-[10px] h-auto py-2 px-1 justify-start text-left block overflow-hidden text-ellipsis whitespace-nowrap"
+                      onClick={() => setPrescription(params)}
+                    >
+                      {name}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-5">
+                <div>
+                  <Label className="text-sm font-medium">
+                    Relative Humidity: {prescription.humidityMin}% - {prescription.humidityMax}%
+                  </Label>
+                  <Slider
+                    value={[prescription.humidityMin, prescription.humidityMax]}
+                    onValueChange={([min, max]) =>
+                      setPrescription({ ...prescription, humidityMin: min, humidityMax: max })
+                    }
+                    min={0}
+                    max={100}
+                    step={1}
+                    className="mt-2"
+                  />
+                </div>
+
+                <div>
+                  <Label className="text-sm font-medium">
+                    Wind Speed: {prescription.windSpeedMin} - {prescription.windSpeedMax} mph
+                  </Label>
+                  <Slider
+                    value={[prescription.windSpeedMin, prescription.windSpeedMax]}
+                    onValueChange={([min, max]) =>
+                      setPrescription({ ...prescription, windSpeedMin: min, windSpeedMax: max })
+                    }
+                    min={0}
+                    max={30}
+                    step={1}
+                    className="mt-2"
+                  />
+                </div>
+
+                <div>
+                  <Label className="text-sm font-medium">
+                    Temperature: {prescription.tempMin} - {prescription.tempMax} °F
+                  </Label>
+                  <Slider
+                    value={[prescription.tempMin, prescription.tempMax]}
+                    onValueChange={([min, max]) =>
+                      setPrescription({ ...prescription, tempMin: min, tempMax: max })
+                    }
+                    min={0}
+                    max={110}
+                    step={1}
+                    className="mt-2"
+                  />
+                </div>
+
+                <div>
+                  <Label className="text-sm font-medium">
+                    Min Ventilation Index: {prescription.minVentilationIndex.toLocaleString()}
+                  </Label>
+                  <Slider
+                    value={[prescription.minVentilationIndex]}
+                    onValueChange={([val]) =>
+                      setPrescription({ ...prescription, minVentilationIndex: val })
+                    }
+                    min={0}
+                    max={100000}
+                    step={5000}
+                    className="mt-2"
+                  />
+                </div>
+
+                <div>
+                  <Label className="text-sm font-medium">
+                    Days Since Rain: {prescription.daysSinceRain}
+                  </Label>
+                  <Slider
+                    value={[prescription.daysSinceRain]}
+                    onValueChange={([val]) =>
+                      setPrescription({ ...prescription, daysSinceRain: val })
+                    }
+                    min={0}
+                    max={90}
+                    step={1}
+                    className="mt-2"
+                  />
+                </div>
               </div>
             </div>
+          </SheetContent>
+        </Sheet>
 
-            <div className="space-y-5">
-              <div>
-                <Label className="text-sm font-medium">
-                  Relative Humidity: {prescription.humidityMin}% - {prescription.humidityMax}%
-                </Label>
-                <Slider
-                  value={[prescription.humidityMin, prescription.humidityMax]}
-                  onValueChange={([min, max]) =>
-                    setPrescription({ ...prescription, humidityMin: min, humidityMax: max })
-                  }
-                  min={0}
-                  max={100}
-                  step={1}
-                  className="mt-2"
-                />
-              </div>
-
-              <div>
-                <Label className="text-sm font-medium">
-                  Wind Speed: {prescription.windSpeedMin} - {prescription.windSpeedMax} mph
-                </Label>
-                <Slider
-                  value={[prescription.windSpeedMin, prescription.windSpeedMax]}
-                  onValueChange={([min, max]) =>
-                    setPrescription({ ...prescription, windSpeedMin: min, windSpeedMax: max })
-                  }
-                  min={0}
-                  max={30}
-                  step={1}
-                  className="mt-2"
-                />
-              </div>
-
-              <div>
-                <Label className="text-sm font-medium">
-                  Temperature: {prescription.tempMin} - {prescription.tempMax} °F
-                </Label>
-                <Slider
-                  value={[prescription.tempMin, prescription.tempMax]}
-                  onValueChange={([min, max]) =>
-                    setPrescription({ ...prescription, tempMin: min, tempMax: max })
-                  }
-                  min={0}
-                  max={110}
-                  step={1}
-                  className="mt-2"
-                />
-              </div>
-
-              <div>
-                <Label className="text-sm font-medium">
-                  Min Ventilation Index: {prescription.minVentilationIndex.toLocaleString()}
-                </Label>
-                <Slider
-                  value={[prescription.minVentilationIndex]}
-                  onValueChange={([val]) =>
-                    setPrescription({ ...prescription, minVentilationIndex: val })
-                  }
-                  min={0}
-                  max={100000}
-                  step={5000}
-                  className="mt-2"
-                />
-              </div>
-
-              <div>
-                <Label className="text-sm font-medium">
-                  Days Since Rain: {prescription.daysSinceRain}
-                </Label>
-                <Slider
-                  value={[prescription.daysSinceRain]}
-                  onValueChange={([val]) =>
-                    setPrescription({ ...prescription, daysSinceRain: val })
-                  }
-                  min={0}
-                  max={90}
-                  step={1}
-                  className="mt-2"
-                />
-              </div>
-            </div>
-          </div>
-        </SheetContent>
-      </Sheet>
+        {/* MDEQ Logo */}
+        <img
+          src="/MDEQ_Logo.gif"
+          alt="MDEQ Logo"
+          className="h-8 sm:h-10 w-auto object-contain"
+        />
+      </div>
     </header>
   );
 }
