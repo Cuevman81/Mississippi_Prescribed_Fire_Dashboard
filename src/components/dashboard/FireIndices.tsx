@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useDashboard } from '@/lib/dashboard-context';
 import { formatNumber, formatWind } from '@/lib/weather-utils';
 import { FFMC_THRESHOLDS } from '@/lib/constants';
+import { motion } from 'framer-motion';
 
 export function FireIndices() {
   const { forecast, currentForecastIdx } = useDashboard();
@@ -67,25 +68,31 @@ export function FireIndices() {
   ];
 
   return (
-    <Card className="bg-white">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium text-slate-500">
-          Fire Weather Indices
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-3">
-          {indices.filter((i) => i.show !== false).map((item) => (
-            <div key={item.label}>
-              <p className="text-xs text-slate-400 font-medium">{item.label}</p>
-              <p className="text-sm font-semibold text-slate-900">{item.value}</p>
-              {item.warn && (
-                <p className="text-xs text-red-600 font-medium">{item.warn}</p>
-              )}
-            </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ delay: 0.2, duration: 0.4 }}
+    >
+      <Card className="h-full">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium text-slate-500">
+            Fire Weather Indices
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-3">
+            {indices.filter((i) => i.show !== false).map((item) => (
+              <div key={item.label}>
+                <p className="text-xs text-slate-400 font-medium">{item.label}</p>
+                <p className="text-sm font-semibold text-slate-900">{item.value}</p>
+                {item.warn && (
+                  <p className="text-xs text-red-600 font-medium">{item.warn}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </motion.div>
   );
 }

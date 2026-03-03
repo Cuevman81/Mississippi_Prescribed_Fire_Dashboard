@@ -119,10 +119,52 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
-    @apply border-border outline-ring/50;
   }
+
   body {
-    @apply bg-background text-foreground;
-    @apply bg-background text-foreground;
+    @apply text-foreground min-h-screen font-sans antialiased;
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  }
+}
+
+/* --- Print Readiness --- */
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  /* Hide unnecessary elements during print */
+  nav,
+  footer,
+  .animate-pulse,
+  .lucide-refresh-cw {
+    display: none !important;
+  }
+
+  /* Optimize card rendering for physical pages */
+  [data-slot="card"] {
+    break-inside: avoid;
+    box-shadow: none !important;
+    border: 1px solid #e2e8f0 !important;
+    background: white !important;
+    margin-bottom: 1rem;
+  }
+
+  /* Ensure charts print correctly */
+  .recharts-wrapper {
+    break-inside: avoid;
+  }
+
+  /* Force headers to remain with their content */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    break-after: avoid;
   }
 }

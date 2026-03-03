@@ -82,7 +82,24 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const [location, setLocation] = useState<GeocodedLocation | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [prescription, setPrescription] = useState<PrescriptionParams>(DEFAULT_PRESCRIPTION);
+  const [prescription, setPrescription] = useState<PrescriptionParams>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('prfi_prescription');
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch (e) {
+          console.error('Failed to parse saved prescription', e);
+        }
+      }
+    }
+    return DEFAULT_PRESCRIPTION;
+  });
+
+  // Persist prescription anytime it changes
+  React.useEffect(() => {
+    localStorage.setItem('prfi_prescription', JSON.stringify(prescription));
+  }, [prescription]);
 
   const [forecast, setForecast] = useState<HourlyForecast[]>([]);
   const [narrativeForecast, setNarrativeForecast] = useState<NarrativePeriod[]>([]);
@@ -106,16 +123,16 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
 
     try {
       let loc: GeocodedLocation;
-      
+
       if (displayName) {
         // We already have geocoded data
-        loc = { 
-          lat, 
-          lon, 
-          displayName, 
-          city: displayName.split(',')[0], 
-          state: '', 
-          stateAbbr: '' 
+        loc = {
+          lat,
+          lon,
+          displayName,
+          city: displayName.split(',')[0],
+          state: '',
+          stateAbbr: ''
         };
       } else {
         // Reverse geocode
@@ -132,7 +149,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
           stateAbbr: '',
         };
       }
-      
+
       setLocation(loc);
 
       // Step 2: Fetch weather + alerts + air quality in parallel
@@ -205,7 +222,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
 
           const vi = calculateVentilationIndex(mixHeightFt, transSpeedMph);
           const localDate = new Date(time);
-          const hour = localDate.getUTCHours(); 
+          const hour = localDate.getUTCHours();
 
           const fuelMoisture = calculateFuelMoisture(tempF, rh, prescription.daysSinceRain);
           const dispersion = determineDispersionCategory(mixHeightFt, transSpeedMph, hour);
@@ -300,8 +317,8 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
             const R = 3959;
             const dLat = (nearest.lat - loc.lat) * Math.PI / 180;
             const dLon = (nearest.lon - loc.lon) * Math.PI / 180;
-            const a = Math.sin(dLat/2)**2 + Math.cos(loc.lat*Math.PI/180)*Math.cos(nearest.lat*Math.PI/180)*Math.sin(dLon/2)**2;
-            const distMiles = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            const a = Math.sin(dLat / 2) ** 2 + Math.cos(loc.lat * Math.PI / 180) * Math.cos(nearest.lat * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+            const distMiles = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
             setStationObservation({
               stationId: nearest.id,
@@ -320,7 +337,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
             });
           }
         }
-      } catch {}
+      } catch { }
 
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');

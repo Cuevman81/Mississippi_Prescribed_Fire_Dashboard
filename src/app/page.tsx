@@ -8,6 +8,7 @@ import { SmokeDispersion } from '@/components/dashboard/SmokeDispersion';
 import { FireIndices } from '@/components/dashboard/FireIndices';
 import { BurnQualityChart } from '@/components/dashboard/BurnQualityChart';
 import { WeatherTrendChart } from '@/components/dashboard/WeatherTrendChart';
+import { BurnWindowFinder } from '@/components/dashboard/BurnWindowFinder';
 import { Flame, Loader2 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
@@ -66,7 +67,7 @@ export default function DashboardPage() {
     <div className="space-y-4">
       <AlertBanner />
       <CurrentConditions />
-      
+
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
         <div className="xl:col-span-2">
           <BurnStatusSummary />
@@ -80,6 +81,8 @@ export default function DashboardPage() {
         <SmokeDispersion />
         <FireIndices />
       </div>
+
+      <BurnWindowFinder />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <BurnQualityChart />

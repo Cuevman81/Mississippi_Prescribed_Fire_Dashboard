@@ -1,12 +1,19 @@
 'use client';
 
-import { Thermometer, Droplets, Wind, ArrowUpDown, CloudRain, Calendar } from 'lucide-react';
+import { Thermometer, Droplets, Wind, ArrowUpDown, CloudRain, Calendar, RefreshCw } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { useDashboard } from '@/lib/dashboard-context';
 import { formatNumber } from '@/lib/weather-utils';
+import { motion } from 'framer-motion';
+import { useState, useEffect } from 'react';
 
 export function CurrentConditions() {
   const { forecast, currentForecastIdx, stationObservation, prescription } = useDashboard();
+  const [lastUpdate, setLastUpdate] = useState<string>('');
+
+  useEffect(() => {
+    setLastUpdate(new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }));
+  }, [forecast, stationObservation]);
 
   // Use the forecast hour closest to now (not forecast[0] which may be stale)
   const nowForecast = forecast[currentForecastIdx] || forecast[0];
@@ -21,10 +28,10 @@ export function CurrentConditions() {
   } : null);
 
   const vi = nowForecast?.ventilationIndex ?? 0;
-  
+
   // Detect if it's currently raining based on forecast code or station (simplified)
-  const isRainingNow = nowForecast?.weatherAbbr?.toLowerCase().includes('rain') || 
-                       nowForecast?.weatherAbbr?.toLowerCase().includes('shwr');
+  const isRainingNow = nowForecast?.weatherAbbr?.toLowerCase().includes('rain') ||
+    nowForecast?.weatherAbbr?.toLowerCase().includes('shwr');
 
   if (!current && !forecast.length) {
     return (
@@ -88,24 +95,37 @@ export function CurrentConditions() {
           <Calendar size={14} />
           <span>Rx Parameter: {prescription.daysSinceRain} Days Since Rain</span>
         </div>
+        {lastUpdate && (
+          <div className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 text-slate-500 rounded-full text-xs font-medium border border-slate-200 ml-auto">
+            <RefreshCw size={12} className={stationObservation ? "animate-spin-slow" : ""} />
+            <span>Last Updated: {lastUpdate}</span>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {items.map((item) => {
+        {items.map((item, index) => {
           const Icon = item.icon;
           return (
-            <Card key={item.label} className="bg-white shadow-sm">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2 mb-1">
-                  <Icon className="h-4 w-4 text-slate-400" />
-                  <span className="text-xs text-slate-500 font-medium">{item.label}</span>
-                </div>
-                <p className={`text-2xl font-bold ${item.color}`}>{item.value}</p>
-                {item.sub && (
-                  <p className="text-xs text-orange-600 mt-1">{item.sub}</p>
-                )}
-              </CardContent>
-            </Card>
+            <motion.div
+              key={item.label}
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.1, duration: 0.4 }}
+            >
+              <Card className="shadow-sm">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Icon className="h-4 w-4 text-slate-400" />
+                    <span className="text-xs text-slate-500 font-medium">{item.label}</span>
+                  </div>
+                  <p className={`text-2xl font-bold ${item.color}`}>{item.value}</p>
+                  {item.sub && (
+                    <p className="text-xs text-orange-600 mt-1">{item.sub}</p>
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
           );
         })}
         {stationObservation && (
