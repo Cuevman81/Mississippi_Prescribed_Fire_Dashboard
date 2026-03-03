@@ -63,25 +63,27 @@ export function Sidebar() {
             </Link>
           );
         })}
-      </nav>
 
-      <div className="p-4 border-t border-slate-700 bg-slate-900 mt-auto">
-        <p className="text-xs text-slate-400 font-medium">
-          Mississippi DEQ
-        </p>
-        <p className="text-[10px] text-slate-500 mt-1 mb-3">
-          Data: NWS, AirNow, NOAA, MFC
-        </p>
-        <div className="pt-3 border-t border-slate-700/50">
-          <p className="text-[10px] text-slate-400 mb-1">For bugs or issues, contact:</p>
-          <a href="mailto:RCuevas@mdeq.ms.gov" className="text-xs font-medium text-orange-400 hover:text-orange-300 transition-colors block">
-            Rodney Cuevas
-          </a>
-          <a href="mailto:RCuevas@mdeq.ms.gov" className="text-[10px] text-slate-500 hover:text-slate-400 transition-colors block">
-            RCuevas@mdeq.ms.gov
-          </a>
+        <div className="pt-6 px-3">
+          <div className="pt-4 border-t border-slate-700/50">
+            <p className="text-xs text-slate-400 font-medium">
+              Mississippi DEQ
+            </p>
+            <p className="text-[10px] text-slate-500 mt-1 mb-3">
+              Data: NWS, AirNow, NOAA, MFC
+            </p>
+            <div className="pt-3 border-t border-slate-700/50">
+              <p className="text-[10px] text-slate-400 mb-1">For bugs or issues, contact:</p>
+              <a href="mailto:RCuevas@mdeq.ms.gov" className="text-xs font-medium text-orange-400 hover:text-orange-300 transition-colors block">
+                Rodney Cuevas
+              </a>
+              <a href="mailto:RCuevas@mdeq.ms.gov" className="text-[10px] text-slate-500 hover:text-slate-400 transition-colors block">
+                RCuevas@mdeq.ms.gov
+              </a>
+            </div>
+          </div>
         </div>
-      </div>
+      </nav>
     </aside>
   );
 }
