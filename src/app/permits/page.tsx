@@ -39,6 +39,7 @@ export default function PermitsPage() {
   const [weatherLoading, setWeatherLoading] = useState(false);
   const weatherFetchedRef = useRef<string>('');
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
+  const [selectedSmokeCounty, setSelectedSmokeCounty] = useState<string | null>(null);
 
   // Fetch permits
   useEffect(() => {
@@ -179,7 +180,7 @@ export default function PermitsPage() {
 
     const currentYearTotal = permits.filter(p => p.year === currentYear).length;
     const currentYearAcres = permits.filter(p => p.year === currentYear).reduce((s, p) => s + (p.burnAcresEstimate || 0), 0);
-    
+
     const prevYearTotal = permits.filter(p => p.year === prevYear).length;
     const prevYearAcres = permits.filter(p => p.year === prevYear).reduce((s, p) => s + (p.burnAcresEstimate || 0), 0);
 
@@ -251,7 +252,7 @@ export default function PermitsPage() {
     for (const p of enrichedTodayPermits) {
       const typePart = (p.burnType || '').trim();
       const purposePart = (p.burnPurpose || '').trim();
-      
+
       let label = 'Unspecified';
       if (typePart && purposePart) {
         // Deduplicate if they are the same
@@ -293,19 +294,19 @@ export default function PermitsPage() {
         {/* Good zone background (top right) */}
         <rect x={xLeft} y={yTop} width={plotWidth} height={plotHeight} fill="#99FF99" fillOpacity={0.15} />
         {/* Fair zone (middle) */}
-        <path 
-          d={`M ${xLeft},${yBottom} L ${xRight},${yBottom} L ${xRight},${yTop + plotHeight * 0.4} L ${xLeft},${yBottom - plotHeight * 0.4} Z`} 
-          fill="#FFFF99" fillOpacity={0.3} 
+        <path
+          d={`M ${xLeft},${yBottom} L ${xRight},${yBottom} L ${xRight},${yTop + plotHeight * 0.4} L ${xLeft},${yBottom - plotHeight * 0.4} Z`}
+          fill="#FFFF99" fillOpacity={0.3}
         />
         {/* Poor zone (bottom left) */}
-        <path 
-          d={`M ${xLeft},${yBottom} L ${xRight},${yBottom} L ${xRight},${yBottom - plotHeight * 0.2} L ${xLeft},${yBottom - plotHeight * 0.1} Z`} 
-          fill="#FF9999" fillOpacity={0.3} 
+        <path
+          d={`M ${xLeft},${yBottom} L ${xRight},${yBottom} L ${xRight},${yBottom - plotHeight * 0.2} L ${xLeft},${yBottom - plotHeight * 0.1} Z`}
+          fill="#FF9999" fillOpacity={0.3}
         />
-        
+
         {/* Labels */}
         <text x={xRight - 40} y={yBottom - 20} fontSize={10} fill="#CC3333" fontWeight="bold" textAnchor="end">Poor</text>
-        <text x={xRight - 40} y={yTop + plotHeight/2} fontSize={10} fill="#999933" fontWeight="bold" textAnchor="end">Fair</text>
+        <text x={xRight - 40} y={yTop + plotHeight / 2} fontSize={10} fill="#999933" fontWeight="bold" textAnchor="end">Fair</text>
         <text x={xLeft + 40} y={yTop + 20} fontSize={10} fill="#339933" fontWeight="bold">Good</text>
       </g>
     );
@@ -374,15 +375,15 @@ export default function PermitsPage() {
       {/* Stats Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         {[
-          { 
-            label: 'Total Permits', 
-            value: formatNumber(stats.total), 
+          {
+            label: 'Total Permits',
+            value: formatNumber(stats.total),
             icon: FileText,
             breakdown: `${currentYear}: ${formatNumber(stats.currentYearTotal)} | ${prevYear}: ${formatNumber(stats.prevYearTotal)}`
           },
-          { 
-            label: 'Total Acres', 
-            value: formatNumber(Math.round(stats.totalAcres)), 
+          {
+            label: 'Total Acres',
+            value: formatNumber(Math.round(stats.totalAcres)),
             icon: MapPin,
             breakdown: `${currentYear}: ${formatNumber(Math.round(stats.currentYearAcres))} | ${prevYear}: ${formatNumber(Math.round(stats.prevYearAcres))}`
           },
@@ -469,10 +470,22 @@ export default function PermitsPage() {
 
         {/* Smoke Dispersion Risk Scatter Plot */}
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-slate-500">
               Smoke Dispersion Risk Analysis (Today)
             </CardTitle>
+            {smokeRiskData.length > 0 && (
+              <select
+                className="text-xs border border-slate-200 rounded-md py-1 px-2 pr-6 bg-white shrink-0 focus:outline-none focus:ring-1 focus:ring-orange-500"
+                value={selectedSmokeCounty || ''}
+                onChange={(e) => setSelectedSmokeCounty(e.target.value || null)}
+              >
+                <option value="">All Counties</option>
+                {smokeRiskData.map(d => d.county).sort().map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            )}
           </CardHeader>
           <CardContent>
             {smokeRiskData.length > 0 ? (
@@ -519,14 +532,48 @@ export default function PermitsPage() {
                   <Scatter
                     data={smokeRiskData}
                     fillOpacity={0.85}
-                    label={smokeRiskData.length <= 12
-                      ? { dataKey: 'county', fill: '#475569', fontSize: 9, offset: 8, position: 'top' }
-                      : undefined
-                    }
+                    label={(props: any) => {
+                      const { x, y, index } = props;
+                      const d = smokeRiskData[index];
+                      if (!d) return null;
+
+                      const isSelected = selectedSmokeCounty === d.county;
+
+                      // Show strong bold label if explicitly selected
+                      if (isSelected) {
+                        return (
+                          <text x={x} y={y - 18} textAnchor="middle" fontSize={11} fontWeight="bold" fill="#0f172a">
+                            {d.county}
+                          </text>
+                        );
+                      }
+
+                      // Fallback to default small labels if fewer than 12 points and nothing is selected
+                      if (smokeRiskData.length <= 12 && !selectedSmokeCounty) {
+                        return (
+                          <text x={x} y={y - 12} textAnchor="middle" fontSize={9} fill="#475569">
+                            {d.county}
+                          </text>
+                        );
+                      }
+
+                      return null;
+                    }}
                   >
-                    {smokeRiskData.map((entry, i) => (
-                      <Cell key={i} fill={PERMIT_DISPERSION_COLORS[entry.quality] || '#999'} stroke="#333" strokeWidth={1} />
-                    ))}
+                    {smokeRiskData.map((entry, i) => {
+                      const isSelected = selectedSmokeCounty === entry.county;
+                      const isDimmed = selectedSmokeCounty && !isSelected;
+
+                      return (
+                        <Cell
+                          key={i}
+                          fill={PERMIT_DISPERSION_COLORS[entry.quality] || '#999'}
+                          fillOpacity={isDimmed ? 0.2 : (isSelected ? 1 : 0.85)}
+                          stroke={isSelected ? '#000' : '#333'}
+                          strokeWidth={isSelected ? 2 : 1}
+                        />
+                      );
+                    })}
                   </Scatter>
                 </ScatterChart>
               </ResponsiveContainer>
@@ -560,10 +607,10 @@ export default function PermitsPage() {
                   margin={{ top: 4, right: 40, bottom: 4, left: 180 }}
                 >
                   <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} label={{ value: 'Number of Permits', position: 'insideBottom', offset: -2, fontSize: 11 }} />
-                  <YAxis 
-                    dataKey="label" 
-                    type="category" 
-                    tick={{ fontSize: 10 }} 
+                  <YAxis
+                    dataKey="label"
+                    type="category"
+                    tick={{ fontSize: 10 }}
                     width={175}
                   />
                   <Tooltip
@@ -688,8 +735,8 @@ export default function PermitsPage() {
                     { label: 'Quality', key: 'dispersionQuality' },
                     { label: 'Source', key: 'source' },
                   ].map((h) => (
-                    <th 
-                      key={h.label} 
+                    <th
+                      key={h.label}
                       className="px-2 py-2 text-left font-medium text-slate-500 whitespace-nowrap cursor-pointer hover:bg-slate-100 transition-colors"
                       onClick={() => requestSort(h.key)}
                     >
@@ -725,11 +772,10 @@ export default function PermitsPage() {
                       </td>
                       <td className="px-2 py-1.5 text-center">
                         {p.certBurnManager ? (
-                          <span className={`px-1 py-0.5 rounded text-[10px] font-medium ${
-                            p.certBurnManager === 'Yes' ? 'bg-green-100 text-green-800' :
-                            p.certBurnManager === 'No' ? 'bg-red-100 text-red-800' :
-                            'bg-slate-100 text-slate-600'
-                          }`}>{p.certBurnManager}</span>
+                          <span className={`px-1 py-0.5 rounded text-[10px] font-medium ${p.certBurnManager === 'Yes' ? 'bg-green-100 text-green-800' :
+                              p.certBurnManager === 'No' ? 'bg-red-100 text-red-800' :
+                                'bg-slate-100 text-slate-600'
+                            }`}>{p.certBurnManager}</span>
                         ) : '—'}
                       </td>
                       <td className="px-2 py-1.5">{p.burnAcresEstimate}</td>
