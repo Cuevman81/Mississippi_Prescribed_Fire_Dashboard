@@ -47,13 +47,6 @@ export default function RootLayout({
               <main className="flex-1 p-4 lg:p-6 overflow-auto">
                 {children}
               </main>
-              <footer className="border-t px-4 py-2 text-center text-xs text-slate-400">
-                Prescribed Fire Weather Dashboard v3.0 — Mississippi DEQ &nbsp;|&nbsp;
-                For bugs or issues, contact{' '}
-                <a href="mailto:RCuevas@mdeq.ms.gov" className="text-orange-600 hover:underline">
-                  Rodney Cuevas — RCuevas@mdeq.ms.gov
-                </a>
-              </footer>
             </div>
           </div>
         </DashboardProvider>
