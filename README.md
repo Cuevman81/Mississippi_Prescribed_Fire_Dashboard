@@ -7,7 +7,8 @@ A comprehensive web-based decision support tool for prescribed fire managers, pr
 ## 🚀 Key Features
 
 ### 1. Real-Time Operational Dashboard
-*   **Burn Status Summary:** Instant "Within/Outside Prescription" status with specific reasons for sub-optimal conditions.
+*   **Burn Status Summary:** Instant "Within/Outside Prescription" status with specific reasons for sub-optimal conditions. 
+*   **Critical Fire Alerts:** High-priority "Veto" logic that automatically flags the burn as RESTRICTED during NWS Fire Weather Watches and Red Flag Warnings.
 *   **Interactive Location Map:** Click-to-set location functionality to get pinpoint forecasts for any burn unit.
 *   **Current Conditions:** Real-time data from the nearest ASOS/AWOS weather stations integrated with NWS high-resolution grid forecasts.
 
@@ -23,7 +24,8 @@ A comprehensive web-based decision support tool for prescribed fire managers, pr
 *   **Drought Monitor:** Latest U.S. Drought Monitor data for long-term fuel moisture context.
 
 ### 4. Field Readiness
-*   **Printable Burn Plan:** Generate a clean, one-page operational summary containing current forecasts, prescription criteria, and 12-hour outlooks designed for field use.
+*   **Printable Burn Plan:** Generate a clean, one-page operational summary containing current forecasts, prescription criteria, and 12-hour outlooks.
+*   **Integrated Safety Warnings:** The printed plan now includes a dedicated high-priority section for critical NWS fire weather alerts to ensure safety documentation.
 
 ## 🔗 Quick Access
 
@@ -34,8 +36,9 @@ No installation or technical setup is required for end users. Simply open the li
 
 ## 🛠 Technical Stack (For Developers)
 
-*   **Framework:** [Next.js 15+](https://nextjs.org/) (React 19)
+*   **Framework:** [Next.js 16+](https://nextjs.org/) (React 19) with Turbopack
 *   **Mapping:** Leaflet & React-Leaflet
+*   **Visualization:** Recharts (Dynamic Fire Density & Smoke Scattering)
 *   **Data Sources:** NWS API, EPA AirNow, NOAA HMS, U.S. Drought Monitor, MFC.
 
 ## 📄 Disclaimer
