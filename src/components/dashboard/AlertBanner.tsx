@@ -52,18 +52,46 @@ export function AlertBanner() {
         </div>
       )}
 
-      {alerts.map((alert, i) => (
-        <div
-          key={i}
-          className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-3 shadow-sm"
-        >
-          <AlertTriangle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="font-semibold text-red-800 text-sm">{alert.event}</p>
-            <p className="text-red-700 text-xs mt-1">{alert.headline}</p>
+      {alerts.map((alert, i) => {
+        const isCriticalFire = ['Red Flag Warning', 'Fire Weather Watch', 'Extreme Fire Danger', 'Fire Warning'].includes(alert.event);
+
+        if (isCriticalFire) {
+          return (
+            <div
+              key={i}
+              className="bg-gradient-to-r from-red-600 to-orange-600 border-2 border-red-900 text-white rounded-lg p-4 flex items-start gap-4 shadow-xl animate-pulse ring-4 ring-red-500/20"
+            >
+              <div className="bg-white/20 p-2 rounded-full">
+                <Flame className="h-6 w-6 text-white flex-shrink-0" />
+              </div>
+              <div className="flex-1">
+                <p className="font-black text-lg tracking-tight uppercase italic flex items-center gap-2">
+                  CRITICAL FIRE WEATHER ALERT: {alert.event}
+                </p>
+                <p className="text-red-50 text-sm font-bold mt-1 leading-tight">
+                  {alert.headline}
+                </p>
+                <div className="mt-2 text-xs bg-black/20 p-2 rounded border border-white/10 italic">
+                  Prescribed burns are NOT RECOMMENDED. Critical fire spread risks detected by NWS.
+                </div>
+              </div>
+            </div>
+          );
+        }
+
+        return (
+          <div
+            key={i}
+            className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-3 shadow-sm"
+          >
+            <AlertTriangle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold text-red-800 text-sm">{alert.event}</p>
+              <p className="text-red-700 text-xs mt-1">{alert.headline}</p>
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
       {burnBanInfo && (
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-3 shadow-sm">
           <Ban className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />

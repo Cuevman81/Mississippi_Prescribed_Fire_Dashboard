@@ -6,13 +6,21 @@ import { useDashboard } from '@/lib/dashboard-context';
 import { motion } from 'framer-motion';
 
 export function BurnStatusSummary() {
-  const { forecast, currentForecastIdx, prescription } = useDashboard();
-
+  const { forecast, currentForecastIdx, prescription, alerts } = useDashboard();
   const nowForecast = forecast[currentForecastIdx] || forecast[0];
 
   if (!nowForecast) return null;
 
   const reasons: string[] = [];
+
+  // Check for critical fire weather alerts
+  const criticalAlerts = alerts.filter(a =>
+    ['Red Flag Warning', 'Fire Weather Watch', 'Extreme Fire Danger', 'Fire Warning'].includes(a.event)
+  );
+
+  if (criticalAlerts.length > 0) {
+    reasons.push(`NWS ${criticalAlerts[0].event} ACTIVE`);
+  }
 
   if (nowForecast.temp < prescription.tempMin) reasons.push(`Temp too low (${nowForecast.temp}°F < ${prescription.tempMin}°F)`);
   if (nowForecast.temp > prescription.tempMax) reasons.push(`Temp too high (${nowForecast.temp}°F > ${prescription.tempMax}°F)`);
@@ -22,7 +30,22 @@ export function BurnStatusSummary() {
   if (nowForecast.windSpeed > prescription.windSpeedMax) reasons.push(`Wind too high (${nowForecast.windSpeed} mph > ${prescription.windSpeedMax} mph)`);
   if (nowForecast.ventilationIndex < prescription.minVentilationIndex) reasons.push(`VI too low (${nowForecast.ventilationIndex.toLocaleString()} < ${prescription.minVentilationIndex.toLocaleString()})`);
 
+  const hasCriticalAlert = criticalAlerts.length > 0;
   const isInPrescription = reasons.length === 0;
+
+  let borderColor = 'border-l-green-500';
+  let bgColor = 'bg-green-50/50';
+  let textColor = 'text-green-800';
+
+  if (hasCriticalAlert) {
+    borderColor = 'border-l-red-600';
+    bgColor = 'bg-red-50/80';
+    textColor = 'text-red-900';
+  } else if (!isInPrescription) {
+    borderColor = 'border-l-amber-500';
+    bgColor = 'bg-amber-50/50';
+    textColor = 'text-amber-800';
+  }
 
   return (
     <motion.div
@@ -30,22 +53,24 @@ export function BurnStatusSummary() {
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.5, ease: "easeOut" }}
     >
-      <Card className={`border-l-8 shadow-lg ${isInPrescription ? 'border-l-green-500 bg-green-50/50 backdrop-blur-md' : 'border-l-amber-500 bg-amber-50/50 backdrop-blur-md'}`}>
+      <Card className={`border-l-8 shadow-lg ${borderColor} ${bgColor} backdrop-blur-md`}>
         <CardContent className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-start gap-4">
             {isInPrescription ? (
-              <CheckCircle2 className="h-8 w-8 text-green-600 mt-0.5" />
+              <CheckCircle2 className={`h-8 w-8 text-green-600 mt-0.5`} />
             ) : (
-              <XCircle className="h-8 w-8 text-amber-600 mt-0.5" />
+              <XCircle className={`h-8 w-8 ${hasCriticalAlert ? 'text-red-600' : 'text-amber-600'} mt-0.5`} />
             )}
             <div>
-              <h3 className={`font-extrabold text-xl ${isInPrescription ? 'text-green-800' : 'text-amber-800'}`}>
-                {isInPrescription ? 'Within Prescription' : 'Outside Prescription'}
+              <h3 className={`font-extrabold text-xl ${textColor}`}>
+                {hasCriticalAlert ? 'BURN VETOED / RESTRICTED' : isInPrescription ? 'Within Prescription' : 'Outside Prescription'}
               </h3>
               <p className="text-sm font-medium text-slate-700 mt-1">
-                {isInPrescription
-                  ? 'Current conditions meet all your set criteria for a prescribed burn.'
-                  : 'Current conditions do not meet one or more of your prescription thresholds.'}
+                {hasCriticalAlert 
+                  ? 'NWS critical fire weather alert is active. Burning is not recommended.'
+                  : isInPrescription
+                    ? 'Current conditions meet all your set criteria for a prescribed burn.'
+                    : 'Current conditions do not meet one or more of your prescription thresholds.'}
               </p>
             </div>
           </div>

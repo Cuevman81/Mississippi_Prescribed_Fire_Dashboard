@@ -1,12 +1,12 @@
 'use client';
 
 import { useDashboard } from '@/lib/dashboard-context';
-import { getBurnQualityColor } from '@/lib/constants';
-import { Flame, MapPin, Wind, Thermometer, Droplets, ArrowUpDown } from 'lucide-react';
+import { getBurnQualityColor, CRITICAL_FIRE_ALERTS } from '@/lib/constants';
+import { Flame, MapPin, Wind, Thermometer, Droplets, ArrowUpDown, AlertTriangle } from 'lucide-react';
 import { useEffect } from 'react';
 
 export default function PrintPlanPage() {
-  const { location, forecast, currentForecastIdx, prescription, stationObservation } = useDashboard();
+  const { location, forecast, currentForecastIdx, prescription, stationObservation, alerts } = useDashboard();
 
   useEffect(() => {
     // Optional: automatically trigger print dialog
@@ -44,6 +44,42 @@ export default function PrintPlanPage() {
           <p>Generated at: {new Date().toLocaleTimeString()}</p>
         </div>
       </div>
+      
+      {/* Critical Alerts Section */}
+      {alerts.length > 0 && (
+        <div className="mb-6 space-y-2">
+          {alerts.map((alert, i) => {
+            const isCritical = CRITICAL_FIRE_ALERTS.includes(alert.event as any);
+            return (
+              <div 
+                key={i} 
+                className={`p-4 rounded-lg border-2 ${isCritical ? 'bg-red-50 border-red-600' : 'bg-amber-50 border-amber-500'}`}
+              >
+                <div className="flex items-start gap-3">
+                  {isCritical ? (
+                    <Flame className="h-6 w-6 text-red-600 flex-shrink-0" />
+                  ) : (
+                    <AlertTriangle className="h-6 w-6 text-amber-600 flex-shrink-0" />
+                  )}
+                  <div>
+                    <h2 className={`font-bold text-lg uppercase tracking-tight ${isCritical ? 'text-red-800' : 'text-amber-800'}`}>
+                      {isCritical ? 'CRITICAL FIRE WEATHER ALERT: ' : 'Weather Alert: '}{alert.event}
+                    </h2>
+                    <p className={`text-sm font-bold mt-0.5 ${isCritical ? 'text-red-700' : 'text-amber-700'}`}>
+                      {alert.headline}
+                    </p>
+                    {isCritical && (
+                      <p className="mt-2 text-xs bg-red-600 text-white px-2 py-1 inline-block font-black rounded uppercase">
+                        PRESCRIBED BURNS ARE NOT RECOMMENDED - HIGH SPREAD RISK
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Location & Conditions Grid */}
       <div className="grid grid-cols-2 gap-8 mb-8">

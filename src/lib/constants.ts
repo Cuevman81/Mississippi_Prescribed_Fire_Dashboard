@@ -161,6 +161,15 @@ export const FFMC_THRESHOLDS = {
   HIGH: 85,
 } as const;
 
+// Critical fire weather alert types that should veto any burn
+export const CRITICAL_FIRE_ALERTS = [
+  'Red Flag Warning',
+  'Fire Weather Watch',
+  'Extreme Fire Danger',
+  'Fire Warning',
+  'Excessive Heat Warning',
+] as const;
+
 // Mississippi bounding box (for AirNow state monitor queries)
 export const MS_BBOX = {
   minLon: -91.655,
