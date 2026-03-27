@@ -614,7 +614,7 @@ export default function PermitsPage() {
                     width={175}
                   />
                   <Tooltip
-                    formatter={(value: number | undefined, name: string | undefined) => [value ?? 0, `Manager: ${name ?? ''}`]}
+                    formatter={(value: any, name: any) => [value ?? 0, `Manager: ${name ?? ''}`]}
                     contentStyle={{ fontSize: 12 }}
                   />
                   <Legend wrapperStyle={{ fontSize: 11 }} formatter={(v) => `Certified Manager: ${v}`} />
