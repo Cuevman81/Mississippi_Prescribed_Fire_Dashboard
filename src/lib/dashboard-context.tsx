@@ -472,8 +472,11 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     setError(null);
     try {
       const geoRes = await fetch(`/api/geocode?q=${encodeURIComponent(locationQuery)}`);
+      if (geoRes.status === 429) {
+        throw new Error('Too many searches in a short time. Please wait a minute and try again.');
+      }
       const geoData = await geoRes.json();
-      if (!geoData.length) throw new Error(`Location not found: "${locationQuery}"`);
+      if (!Array.isArray(geoData) || !geoData.length) throw new Error(`Location not found: "${locationQuery}"`);
       const loc = geoData[0] as GeocodedLocation;
       await fetchForecastByCoords(loc.lat, loc.lon, loc.displayName);
     } catch (err) {

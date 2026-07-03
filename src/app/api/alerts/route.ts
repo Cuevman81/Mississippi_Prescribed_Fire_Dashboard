@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { rateLimit } from '@/lib/rate-limit';
 
 const NWS_HEADERS = {
   'User-Agent': process.env.NWS_USER_AGENT || 'PrescribedBurnApp/3.0',
@@ -6,6 +7,9 @@ const NWS_HEADERS = {
 };
 
 export async function GET(request: NextRequest) {
+  const limited = rateLimit(request, 30);
+  if (limited) return limited;
+
   const lat = request.nextUrl.searchParams.get('lat');
   const lon = request.nextUrl.searchParams.get('lon');
   const nwsOffice = request.nextUrl.searchParams.get('office');

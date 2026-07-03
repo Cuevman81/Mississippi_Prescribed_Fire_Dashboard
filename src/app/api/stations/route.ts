@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { rateLimit } from '@/lib/rate-limit';
 
 export async function GET(request: NextRequest) {
+  const limited = rateLimit(request, 20);
+  if (limited) return limited;
+
   const stationId = request.nextUrl.searchParams.get('id');
 
   if (!stationId || !/^[A-Za-z0-9_]{3,10}$/.test(stationId)) {

@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { rateLimit } from '@/lib/rate-limit';
 
 const API_KEY = process.env.AIRNOW_API_KEY;
 const MS_BBOX = '-91.655,30.174,-88.098,34.996';
 
 export async function GET(request: NextRequest) {
+  const limited = rateLimit(request, 40); // dashboard fires 3 AQ calls per search
+  if (limited) return limited;
+
   const type = request.nextUrl.searchParams.get('type'); // current | forecast | monitors
   const lat = request.nextUrl.searchParams.get('lat');
   const lon = request.nextUrl.searchParams.get('lon');

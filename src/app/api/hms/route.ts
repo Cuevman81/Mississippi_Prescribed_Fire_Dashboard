@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import shp from 'shpjs';
+import { rateLimit } from '@/lib/rate-limit';
 
 export async function GET(request: NextRequest) {
+  const limited = rateLimit(request, 20); // allows browsing back through dates
+  if (limited) return limited;
+
   const dateParam = request.nextUrl.searchParams.get('date');
   if (dateParam && !/^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
     return NextResponse.json({ error: 'Invalid date format. Use YYYY-MM-DD' }, { status: 400 });

@@ -1,19 +1,21 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import shp from 'shpjs';
+import { rateLimit } from '@/lib/rate-limit';
 
-// Cache drought data for 6 hours (updated weekly by USDM)
-let cachedData: { data: unknown; timestamp: number } | null = null;
-const CACHE_DURATION = 6 * 60 * 60 * 1000;
+// USDM updates weekly (Thursdays); cache upstream fetch in Next's shared
+// data cache and CDN-cache the route response for 6 hours.
+const REVALIDATE_SECONDS = 6 * 60 * 60;
+const CACHE_HEADERS = {
+  'Cache-Control': `public, s-maxage=${REVALIDATE_SECONDS}, stale-while-revalidate=3600`,
+};
 
-export async function GET() {
-  // Return cached data if fresh
-  if (cachedData && Date.now() - cachedData.timestamp < CACHE_DURATION) {
-    return NextResponse.json(cachedData.data);
-  }
+export async function GET(request: NextRequest) {
+  const limited = rateLimit(request, 10);
+  if (limited) return limited;
 
   try {
     const url = 'https://droughtmonitor.unl.edu/data/shapefiles_m/USDM_current_M.zip';
-    const res = await fetch(url);
+    const res = await fetch(url, { next: { revalidate: REVALIDATE_SECONDS } });
 
     if (!res.ok) {
       return NextResponse.json({ error: 'Drought data unavailable' }, { status: res.status });
@@ -57,8 +59,7 @@ export async function GET() {
       lastUpdated: new Date().toISOString(),
     };
 
-    cachedData = { data: dataWithMeta, timestamp: Date.now() };
-    return NextResponse.json(dataWithMeta);
+    return NextResponse.json(dataWithMeta, { headers: CACHE_HEADERS });
   } catch (err) {
     console.error('Drought API error:', err);
     return NextResponse.json({ error: 'Drought data service unavailable' }, { status: 500 });

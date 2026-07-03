@@ -1,20 +1,29 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { rateLimit } from '@/lib/rate-limit';
 
-// Cache permit data for 5 minutes
-let cachedData: { data: unknown; timestamp: number } | null = null;
-const CACHE_DURATION = 5 * 60 * 1000;
+// Caching strategy: upstream ArcGIS fetches use Next's data cache
+// (revalidate), which is shared across serverless instances on Vercel —
+// unlike a module-level variable, which is per-instance and mostly misses.
+// The route response is additionally CDN-cached via s-maxage.
+const CACHE_HEADERS = {
+  'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
+};
 
-export async function GET() {
-  // Return cached data if fresh
-  if (cachedData && Date.now() - cachedData.timestamp < CACHE_DURATION) {
-    return NextResponse.json(cachedData.data);
-  }
+// The ArcGIS item metadata (app -> webmap -> layer URL) changes rarely
+const META_REVALIDATE = 24 * 60 * 60;
+// Permit records refresh throughout the day
+const DATA_REVALIDATE = 300;
+
+export async function GET(request: NextRequest) {
+  const limited = rateLimit(request, 10);
+  if (limited) return limited;
 
   try {
     // Step 1: Get the app data to find the webmap ID
     const appId = '14bb6f3f82b14f8e9df45eff193b809a';
     const appRes = await fetch(
-      `https://mfcgis.maps.arcgis.com/sharing/rest/content/items/${appId}/data?f=json`
+      `https://mfcgis.maps.arcgis.com/sharing/rest/content/items/${appId}/data?f=json`,
+      { next: { revalidate: META_REVALIDATE } }
     );
 
     if (!appRes.ok) {
@@ -30,7 +39,8 @@ export async function GET() {
 
     // Step 2: Get webmap data to find the layer URL
     const mapRes = await fetch(
-      `https://mfcgis.maps.arcgis.com/sharing/rest/content/items/${webmapId}/data?f=json`
+      `https://mfcgis.maps.arcgis.com/sharing/rest/content/items/${webmapId}/data?f=json`,
+      { next: { revalidate: META_REVALIDATE } }
     );
 
     if (!mapRes.ok) {
@@ -102,8 +112,7 @@ export async function GET() {
       };
     }).filter((p: { year: number }) => p.year > 0);
 
-    cachedData = { data: permits, timestamp: Date.now() };
-    return NextResponse.json(permits);
+    return NextResponse.json(permits, { headers: CACHE_HEADERS });
   } catch (err) {
     console.error('Permits API error:', err);
     return NextResponse.json({ error: 'Permit data service unavailable' }, { status: 500 });
@@ -125,7 +134,9 @@ async function pullArcGISData(baseUrl: string): Promise<Record<string, unknown>[
       orderByFields: 'objectid ASC',
     });
 
-    const res = await fetch(`${baseUrl}/query?${params}`);
+    const res = await fetch(`${baseUrl}/query?${params}`, {
+      next: { revalidate: DATA_REVALIDATE },
+    });
     if (!res.ok) break;
 
     const data = await res.json();

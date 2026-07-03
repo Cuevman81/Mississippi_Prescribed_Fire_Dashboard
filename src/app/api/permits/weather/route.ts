@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { convertNWSValue, parseISODuration } from '@/lib/weather-utils';
+import { rateLimit } from '@/lib/rate-limit';
 
 const NWS_UA = process.env.NWS_USER_AGENT || 'PrescribedBurnApp/3.0';
 
@@ -26,6 +27,9 @@ const CACHE_TTL = 15 * 60 * 1000;
  * Returns: { [county]: CountyWeather }
  */
 export async function POST(request: NextRequest) {
+  const limited = rateLimit(request, 10);
+  if (limited) return limited;
+
   try {
     const { counties } = await request.json() as {
       counties: { county: string; lat: number; lon: number }[];

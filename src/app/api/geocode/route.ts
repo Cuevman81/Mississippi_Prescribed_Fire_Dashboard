@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { rateLimit } from '@/lib/rate-limit';
 
 export async function GET(request: NextRequest) {
+  // Nominatim's usage policy caps clients at ~1 req/sec; keep our own
+  // callers well under it and cache repeated queries for a day.
+  const limited = rateLimit(request, 15);
+  if (limited) return limited;
+
   const query = request.nextUrl.searchParams.get('q');
   if (!query || query.length > 100) {
     return NextResponse.json({ error: 'Invalid or missing query parameter (max 100 characters)' }, { status: 400 });
@@ -13,6 +19,7 @@ export async function GET(request: NextRequest) {
         headers: {
           'User-Agent': process.env.NWS_USER_AGENT || 'PrescribedBurnApp/3.0',
         },
+        next: { revalidate: 86400 },
       }
     );
 
