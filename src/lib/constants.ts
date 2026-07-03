@@ -208,11 +208,20 @@ export const NAV_ITEMS = [
 ] as const;
 
 // FFMC risk thresholds
-export const FFMC_THRESHOLDS = {
-  EXTREME: 92,
-  VERY_HIGH: 89,
-  HIGH: 85,
+// Fosberg Fire Weather Index (Fosberg 1978). FFWI >= 50 is a commonly
+// used operational threshold for significant fire weather.
+export const FFWI_SIGNIFICANT = 50;
+
+// Fine (1-hr) dead fuel moisture thresholds, percent. Southern Rx
+// guides treat fine fuels below ~6% as spotting / extreme fire
+// behavior territory; 7-20% is the generally recommended Rx range.
+export const FUEL_MOISTURE_1HR = {
+  EXTREME: 5,
+  ELEVATED: 7,
 } as const;
+
+// Real KBDI severity threshold (0-800 scale) for the drought alert
+export const KBDI_SEVERE = 600;
 
 // Critical fire weather alert types that should veto any burn
 export const CRITICAL_FIRE_ALERTS = [

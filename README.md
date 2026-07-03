@@ -41,6 +41,17 @@ No installation or technical setup is required for end users. Simply open the li
 *   **Visualization:** Recharts (Dynamic Fire Density & Smoke Scattering)
 *   **Data Sources:** NWS API, EPA AirNow, NOAA HMS, U.S. Drought Monitor, MFC.
 
+### Fire Science Foundations
+
+All fire-weather indices are computed from published, citable methods:
+
+*   **Atmospheric Dispersion Index (ADI):** Exact implementation of Lavdas (1986), USDA Forest Service Research Paper SE-256, including Turner (1964) stability classification from solar elevation, cloud cover, and wind. Validated against all 27 test vectors published in the paper.
+*   **LVORI:** Low Visibility Occurrence Risk Index (Lavdas & Achtemeier 1995) for nighttime smoke/fog road hazards, with operational thresholds from USDA GTR SRS-103.
+*   **KBDI:** Real Keetch-Byram Drought Index (Keetch & Byram 1968, Alexander 1990 correction) computed daily from observed NOAA/PRISM rainfall and temperature — not an approximation.
+*   **Fosberg Fire Weather Index** (Fosberg 1978) for instantaneous fire-weather severity.
+*   **Fuel moisture:** Simard (1968) equilibrium moisture content, with ignition alerts keyed to southern Rx guide fine-fuel thresholds.
+*   **Ventilation Index** categories per the Southern Forestry Smoke Management Guidebook.
+
 ### Data Integrity & Security
 
 *   **Unit-aware NWS conversions:** All grid values (transport wind, mixing height, temperature) are converted using the unit-of-measure (`uom`) declared by the NWS API rather than hardcoded assumptions, so the Ventilation Index and dispersion categories match official data exactly.

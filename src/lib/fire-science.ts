@@ -1,28 +1,42 @@
 // ============================================================
 // Fire Science Calculations
-// Ported from Prescribed_Burning_APP.R
+//
+// Simard (1968) equilibrium moisture content; Fosberg (1978)
+// Fire Weather Index. Real KBDI is computed from observed daily
+// precipitation/temperature in /api/kbdi (Keetch & Byram 1968,
+// with Alexander 1990 corrections); the old on-the-fly linear
+// KBDI/FFMC approximations were removed because they produced
+// false alarms and a dead >600 drought alert.
 // ============================================================
 
 import type { FuelMoisture, DispersionResult, BurnAssessment } from './types';
 
 /**
- * Calculate KBDI Trend (Keetch-Byram Drought Index - simplified)
- * Indicates long-term drought (0-800 scale)
+ * Simard/NFDRS equilibrium moisture content (percent) from temperature
+ * (deg F) and relative humidity (percent). Shared by the fuel moisture
+ * model and the Fosberg index.
  */
-export function calculateKBDITrend(temp: number, humidity: number): number {
-  return (100 - humidity) * 2 + (temp - 60) * 0.5;
+export function equilibriumMoistureContent(temp: number, humidity: number): number {
+  if (humidity <= 10) {
+    return 0.03229 + 0.281073 * humidity - 0.000578 * humidity * temp;
+  } else if (humidity <= 50) {
+    return 2.22749 + 0.160107 * humidity - 0.01478 * temp;
+  }
+  return 21.0606 + 0.005565 * humidity * humidity - 0.00035 * humidity * temp - 0.483199 * humidity;
 }
 
 /**
- * Calculate Fine Fuel Moisture Code (FFMC)
- * Estimates moisture in 1-hour fuel timelag class (0-100 scale)
- * >92: Extreme ignition potential
- * 89-91: Very High
- * 85-88: High
+ * Fosberg Fire Weather Index (Fosberg 1978): an instantaneous
+ * fire-weather severity index from temperature, RH, and wind, scaled
+ * 0-100 (100 corresponds to 0% moisture and 30 mph wind). A common
+ * operational threshold is FFWI >= 50 for significant fire weather.
  */
-export function calculateFFMC(temp: number, humidity: number, windSpeed: number): number {
-  const ffmc = 85 + (temp - 60) * 0.3 - (humidity - 45) * 0.5 + windSpeed * 0.1;
-  return Math.max(0, Math.min(100, ffmc));
+export function calculateFFWI(temp: number, humidity: number, windSpeedMph: number): number {
+  const m = Math.max(0, equilibriumMoistureContent(temp, humidity));
+  const r = m / 30;
+  const eta = 1 - 2 * r + 1.5 * r * r - 0.5 * r * r * r; // moisture damping
+  const ffwi = (Math.max(0, eta) * Math.sqrt(1 + windSpeedMph * windSpeedMph)) / 0.3002;
+  return Math.max(0, Math.min(100, ffwi));
 }
 
 /**
@@ -34,15 +48,7 @@ export function calculateFuelMoisture(
   humidity: number,
   daysSinceRain: number
 ): FuelMoisture {
-  // Simard EMC calculation with three humidity branches
-  let emc: number;
-  if (humidity <= 10) {
-    emc = 0.03229 + 0.281073 * humidity - 0.000578 * humidity * temp;
-  } else if (humidity <= 50) {
-    emc = 2.22749 + 0.160107 * humidity - 0.01478 * temp;
-  } else {
-    emc = 21.0606 + 0.005565 * humidity * humidity - 0.00035 * humidity * temp - 0.483199 * humidity;
-  }
+  const emc = equilibriumMoistureContent(temp, humidity);
 
   // 1-hour fuel moisture = EMC directly
   const oneHour = Math.max(1, Math.min(35, emc));
@@ -69,41 +75,31 @@ export function calculateIgnitionProbability(
 }
 
 /**
- * Determine smoke dispersion category based on ventilation index
- * Applies stability adjustment based on time of day
+ * Smoke dispersion category from the raw Ventilation Index, using the
+ * Southern Forestry Smoke Management Guidebook thresholds. Diurnal
+ * stability is already reflected in the NWS mixing height forecast
+ * (which collapses at night), and is modeled rigorously by the Lavdas
+ * ADI in dispersion.ts — no ad-hoc time-of-day multiplier here.
  */
 export function determineDispersionCategory(
   mixingHeightFt: number,
-  transportWindMph: number,
-  timeOfDay: number // hour 0-23
+  transportWindMph: number
 ): DispersionResult {
-  const vi = mixingHeightFt * transportWindMph;
-
-  // Stability adjustment based on time of day
-  let stabilityFactor: number;
-  if (timeOfDay >= 10 && timeOfDay <= 15) {
-    stabilityFactor = 1.0; // Most unstable (afternoon)
-  } else if ((timeOfDay >= 7 && timeOfDay < 10) || (timeOfDay > 15 && timeOfDay <= 18)) {
-    stabilityFactor = 0.8; // Transition periods
-  } else {
-    stabilityFactor = 0.5; // Most stable (night)
-  }
-
-  const adjustedVI = vi * stabilityFactor;
+  const vi = Math.round(mixingHeightFt * transportWindMph);
 
   let category: string;
   let description: string;
 
-  if (adjustedVI >= 60000) {
+  if (vi >= 60000) {
     category = 'Excellent';
     description = 'Rapid smoke dispersal expected. Excellent conditions for burning.';
-  } else if (adjustedVI >= 40000) {
+  } else if (vi >= 40000) {
     category = 'Good';
     description = 'Good smoke dispersal. Favorable conditions for prescribed burning.';
-  } else if (adjustedVI >= 20000) {
+  } else if (vi >= 20000) {
     category = 'Fair';
     description = 'Moderate dispersion. Monitor smoke carefully during burn operations.';
-  } else if (adjustedVI >= 10000) {
+  } else if (vi >= 10000) {
     category = 'Poor';
     description = 'Limited smoke dispersal. Consider postponing burn operations.';
   } else {
@@ -111,7 +107,7 @@ export function determineDispersionCategory(
     description = 'Smoke trapping likely. Do NOT burn under these conditions.';
   }
 
-  return { category, description, adjustedVI: Math.round(adjustedVI) };
+  return { category, description, ventilationIndex: vi };
 }
 
 /**

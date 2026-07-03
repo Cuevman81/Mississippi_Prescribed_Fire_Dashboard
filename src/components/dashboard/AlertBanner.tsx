@@ -1,18 +1,22 @@
 'use client';
 
-import { AlertTriangle, Ban, Flame } from 'lucide-react';
+import { AlertTriangle, Ban, Flame, Droplets } from 'lucide-react';
 import { useDashboard } from '@/lib/dashboard-context';
-import { FFMC_THRESHOLDS, CRITICAL_FIRE_ALERTS } from '@/lib/constants';
+import { CRITICAL_FIRE_ALERTS, FUEL_MOISTURE_1HR, KBDI_SEVERE } from '@/lib/constants';
 
 export function AlertBanner() {
-  const { alerts, burnBanInfo, forecast, currentForecastIdx } = useDashboard();
+  const { alerts, burnBanInfo, forecast, currentForecastIdx, kbdi } = useDashboard();
 
   const current = forecast[currentForecastIdx] || forecast[0];
-  const isExtremeIgnition = current?.ffmc >= FFMC_THRESHOLDS.EXTREME;
-  const isVeryHighIgnition = current?.ffmc >= FFMC_THRESHOLDS.VERY_HIGH && current?.ffmc < FFMC_THRESHOLDS.EXTREME;
-  const isHighKBDI = current?.kbdiTrend > 600;
+  // Ignition alerts keyed to fine dead fuel moisture (Simard EMC):
+  // southern Rx guides treat fine fuels below ~6% as spotting territory
+  const fm1 = current?.fuelMoisture1hr;
+  const isExtremeIgnition = fm1 != null && fm1 < FUEL_MOISTURE_1HR.EXTREME;
+  const isElevatedIgnition = fm1 != null && !isExtremeIgnition && fm1 < FUEL_MOISTURE_1HR.ELEVATED;
+  // Real KBDI (Keetch & Byram 1968, computed from observed climate data)
+  const isSevereDrought = kbdi != null && kbdi.kbdi > KBDI_SEVERE;
 
-  if (!alerts.length && !burnBanInfo && !isExtremeIgnition && !isVeryHighIgnition && !isHighKBDI) return null;
+  if (!alerts.length && !burnBanInfo && !isExtremeIgnition && !isElevatedIgnition && !isSevereDrought) return null;
 
   return (
     <div className="space-y-2 mb-4">
@@ -20,33 +24,33 @@ export function AlertBanner() {
         <div className="bg-red-600 border border-red-800 text-white rounded-lg p-3 flex items-start gap-3 shadow-md animate-pulse">
           <Flame className="h-5 w-5 text-red-100 flex-shrink-0 mt-0.5" />
           <div>
-            <p className="font-bold text-sm">EXTREME IGNITION POTENTIAL!</p>
+            <p className="font-bold text-sm">EXTREME IGNITION POTENTIAL</p>
             <p className="text-red-100 text-xs mt-1">
-              Fine Fuel Moisture Code (FFMC) is critically high ({current.ffmc}). Any ignition source will likely result in rapid fire spread. EXTREME CAUTION ADVISED.
+              Fine dead fuel moisture is critically low ({fm1}%). Spotting and erratic fire behavior are likely. Southern Rx guidelines recommend fine fuel moisture of 7-20% for prescribed burning.
             </p>
           </div>
         </div>
       )}
 
-      {isVeryHighIgnition && (
+      {isElevatedIgnition && (
         <div className="bg-orange-500 border border-orange-700 text-white rounded-lg p-3 flex items-start gap-3 shadow-sm">
           <Flame className="h-5 w-5 text-orange-100 flex-shrink-0 mt-0.5" />
           <div>
-            <p className="font-bold text-sm">Very High Ignition Potential</p>
+            <p className="font-bold text-sm">Low Fine Fuel Moisture</p>
             <p className="text-orange-100 text-xs mt-1">
-              FFMC is very high ({current.ffmc}). Spot fires are highly probable.
+              Fine dead fuel moisture ({fm1}%) is below the 7% floor recommended for southern prescribed burns. Expect fast ignition and possible spot fires.
             </p>
           </div>
         </div>
       )}
 
-      {isHighKBDI && (
+      {isSevereDrought && kbdi && (
         <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 flex items-start gap-3 shadow-sm">
-          <AlertTriangle className="h-5 w-5 text-orange-600 flex-shrink-0 mt-0.5" />
+          <Droplets className="h-5 w-5 text-orange-600 flex-shrink-0 mt-0.5" />
           <div>
-            <p className="font-semibold text-orange-800 text-sm">Severe Drought Condition</p>
+            <p className="font-semibold text-orange-800 text-sm">Severe Drought — KBDI {kbdi.kbdi}</p>
             <p className="text-orange-700 text-xs mt-1">
-              KBDI is extremely high ({current.kbdiTrend}). Ground fuels and heavy timber are critically dry and will contribute significantly to fire intensity.
+              {kbdi.description} (Observed KBDI as of {kbdi.asOfDate}.)
             </p>
           </div>
         </div>

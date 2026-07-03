@@ -77,6 +77,7 @@ export async function GET(request: NextRequest) {
       transportWindDirection: { values: gp.transportWindDirection?.values || [], uom: gp.transportWindDirection?.uom || '' },
       hainesIndex: { values: gp.hainesIndex?.values || [], uom: gp.hainesIndex?.uom || '' },
       probabilityOfPrecipitation: { values: gp.probabilityOfPrecipitation?.values || [], uom: gp.probabilityOfPrecipitation?.uom || '' },
+      ceilingHeight: { values: gp.ceilingHeight?.values || [], uom: gp.ceilingHeight?.uom || '' },
     };
 
     return NextResponse.json({

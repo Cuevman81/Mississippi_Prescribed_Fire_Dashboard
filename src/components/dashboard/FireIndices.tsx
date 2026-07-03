@@ -3,11 +3,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useDashboard } from '@/lib/dashboard-context';
 import { formatNumber, formatWind } from '@/lib/weather-utils';
-import { FFMC_THRESHOLDS } from '@/lib/constants';
+import { FFWI_SIGNIFICANT, FUEL_MOISTURE_1HR } from '@/lib/constants';
 import { motion } from 'framer-motion';
 
 export function FireIndices() {
-  const { forecast, currentForecastIdx } = useDashboard();
+  const { forecast, currentForecastIdx, kbdi } = useDashboard();
   const current = forecast[currentForecastIdx] || forecast[0];
 
   if (!current) return null;
@@ -37,21 +37,23 @@ export function FireIndices() {
       show: current.precipChance > 0,
     },
     {
-      label: 'Est. KBDI Trend',
-      value: `${current.kbdiTrend}`,
+      label: 'KBDI (observed)',
+      value: kbdi ? `${kbdi.kbdi} — ${kbdi.category}` : 'n/a',
+      warn: kbdi && kbdi.kbdi >= 600 ? 'Severe drought' : undefined,
     },
     {
-      label: 'FFMC (Fine Fuel)',
-      value: `${current.ffmc}`,
-      warn: current.ffmc >= FFMC_THRESHOLDS.EXTREME
-        ? 'EXTREME ignition potential'
-        : current.ffmc >= FFMC_THRESHOLDS.VERY_HIGH
-          ? 'Very high ignition potential'
-          : undefined,
+      label: 'Fosberg FWI',
+      value: `${current.ffwi}`,
+      warn: current.ffwi >= FFWI_SIGNIFICANT ? 'Significant fire weather' : undefined,
     },
     {
       label: '1-Hr Fuel Moisture',
       value: `${current.fuelMoisture1hr}%`,
+      warn: current.fuelMoisture1hr < FUEL_MOISTURE_1HR.EXTREME
+        ? 'Spotting likely (<5%)'
+        : current.fuelMoisture1hr < FUEL_MOISTURE_1HR.ELEVATED
+          ? 'Below 7% Rx floor'
+          : undefined,
     },
     {
       label: '10-Hr Fuel Moisture',

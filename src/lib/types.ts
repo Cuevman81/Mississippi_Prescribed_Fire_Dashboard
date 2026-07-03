@@ -25,14 +25,17 @@ export interface HourlyForecast {
   hainesIndex: number;
   precipChance: number; // %
   ventilationIndex: number;
-  kbdiTrend: number;
-  ffmc: number;
+  ffwi: number; // Fosberg Fire Weather Index (0-100)
   fuelMoisture1hr: number; // %
   fuelMoisture10hr: number; // %
   fuelMoisture100hr: number; // %
   dispersionCategory: string;
   dispersionDescription: string;
-  adjustedVI: number;
+  stabilityClass: number; // Turner class 1-7
+  adi: number; // Lavdas Atmospheric Dispersion Index
+  adiCategory: string;
+  lvori: number; // Low Visibility Occurrence Risk Index 1-10
+  isDay: boolean;
   burnQuality: string;
   burnScore: number;
   ignitionProbability: number; // %
@@ -280,7 +283,18 @@ export interface FuelMoisture {
 export interface DispersionResult {
   category: string;
   description: string;
-  adjustedVI: number;
+  ventilationIndex: number;
+}
+
+// --- Real KBDI (from /api/kbdi, computed from observed climate data) ---
+
+export interface KBDIData {
+  kbdi: number; // 0-800
+  category: string;
+  description: string;
+  asOfDate: string;
+  annualRainfallIn: number;
+  source: string;
 }
 
 // --- Burn Assessment ---

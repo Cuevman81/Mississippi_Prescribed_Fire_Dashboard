@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import {
-  calculateKBDITrend,
-  calculateFFMC,
+  calculateFFWI,
   calculateFuelMoisture,
   calculateIgnitionProbability,
   determineDispersionCategory,
   assessBurnWindow,
   calculateVentilationIndex,
+  equilibriumMoistureContent,
 } from './fire-science';
 
 describe('calculateVentilationIndex', () => {
@@ -24,32 +24,60 @@ describe('calculateVentilationIndex', () => {
 });
 
 describe('determineDispersionCategory', () => {
-  it('applies full mixing during afternoon hours (10-15 local)', () => {
-    expect(determineDispersionCategory(6000, 10, 12).adjustedVI).toBe(60000);
-    expect(determineDispersionCategory(6000, 10, 10).adjustedVI).toBe(60000);
-    expect(determineDispersionCategory(6000, 10, 15).adjustedVI).toBe(60000);
+  // Categories from the raw Ventilation Index per the Southern Forestry
+  // Smoke Management Guidebook. No ad-hoc time-of-day multiplier —
+  // diurnal stability is in the NWS mixing height and the Lavdas ADI.
+  it('categorizes raw VI into dispersion classes', () => {
+    expect(determineDispersionCategory(6000, 10).category).toBe('Excellent'); // 60k
+    expect(determineDispersionCategory(4500, 10).category).toBe('Good');      // 45k
+    expect(determineDispersionCategory(2500, 10).category).toBe('Fair');      // 25k
+    expect(determineDispersionCategory(1500, 10).category).toBe('Poor');      // 15k
+    expect(determineDispersionCategory(500, 10).category).toBe('Very Poor');  // 5k
   });
 
-  it('applies 0.8 factor during morning/evening transitions', () => {
-    expect(determineDispersionCategory(6000, 10, 8).adjustedVI).toBe(48000);
-    expect(determineDispersionCategory(6000, 10, 17).adjustedVI).toBe(48000);
-  });
-
-  it('applies 0.5 factor at night (stable atmosphere)', () => {
-    expect(determineDispersionCategory(6000, 10, 22).adjustedVI).toBe(30000);
-    expect(determineDispersionCategory(6000, 10, 4).adjustedVI).toBe(30000);
-  });
-
-  it('categorizes adjusted VI into dispersion classes', () => {
-    expect(determineDispersionCategory(6000, 10, 12).category).toBe('Excellent'); // 60k
-    expect(determineDispersionCategory(4500, 10, 12).category).toBe('Good');      // 45k
-    expect(determineDispersionCategory(2500, 10, 12).category).toBe('Fair');      // 25k
-    expect(determineDispersionCategory(1500, 10, 12).category).toBe('Poor');      // 15k
-    expect(determineDispersionCategory(500, 10, 12).category).toBe('Very Poor');  // 5k
+  it('reports the raw ventilation index', () => {
+    expect(determineDispersionCategory(6000, 10).ventilationIndex).toBe(60000);
   });
 
   it('warns against burning in Very Poor conditions', () => {
-    expect(determineDispersionCategory(500, 10, 12).description).toContain('Do NOT burn');
+    expect(determineDispersionCategory(500, 10).description).toContain('Do NOT burn');
+  });
+});
+
+describe('calculateFFWI — Fosberg (1978) Fire Weather Index', () => {
+  it('reaches ~100 at zero moisture and 30 mph wind (calibration point)', () => {
+    // EMC is 0 only at rh ~0; use rh=0 -> m=0.03229, eta ~0.9979
+    expect(calculateFFWI(70, 0, 30)).toBeGreaterThan(99);
+  });
+
+  it('is low in humid, calm conditions', () => {
+    expect(calculateFFWI(93, 66, 4)).toBeLessThan(15);
+  });
+
+  it('REGRESSION: does not flag classic in-prescription Rx days as extreme', () => {
+    // These conditions produced false EXTREME banners under the old
+    // pseudo-FFMC (93.6-95.0 on a 92+ alarm threshold)
+    expect(calculateFFWI(65, 32, 6)).toBeLessThan(50);  // classic Feb burn day
+    expect(calculateFFWI(70, 33, 10)).toBeLessThan(50); // dry spring Rx day
+    expect(calculateFFWI(75, 40, 8)).toBeLessThan(50);  // mild Rx day
+  });
+
+  it('flags genuinely dangerous fire weather', () => {
+    // Very dry, hot, windy: RH 8%, 95F, 25 mph
+    expect(calculateFFWI(95, 8, 25)).toBeGreaterThan(50);
+  });
+
+  it('increases with wind and dryness', () => {
+    expect(calculateFFWI(75, 25, 20)).toBeGreaterThan(calculateFFWI(75, 25, 10));
+    expect(calculateFFWI(75, 15, 10)).toBeGreaterThan(calculateFFWI(75, 45, 10));
+  });
+});
+
+describe('equilibriumMoistureContent', () => {
+  it('matches the Simard branch values used by calculateFuelMoisture', () => {
+    expect(equilibriumMoistureContent(70, 5)).toBeCloseTo(1.235, 2);
+    expect(equilibriumMoistureContent(70, 30)).toBeCloseTo(5.996, 2);
+    expect(equilibriumMoistureContent(70, 80)).toBeCloseTo(16.06, 1);
   });
 });
 
@@ -129,29 +157,10 @@ describe('calculateFuelMoisture (Simard EMC)', () => {
   });
 });
 
-describe('calculateFFMC', () => {
-  it('computes the simplified FFMC estimate', () => {
-    // 85 + (70-60)*0.3 - (30-45)*0.5 + 10*0.1 = 96.5
-    expect(calculateFFMC(70, 30, 10)).toBeCloseTo(96.5, 1);
-  });
-
-  it('clamps to the 0-100 range', () => {
-    expect(calculateFFMC(200, 0, 100)).toBe(100);
-    expect(calculateFFMC(-100, 100, 0)).toBeGreaterThanOrEqual(0);
-  });
-});
-
 describe('calculateIgnitionProbability', () => {
   it('decreases with fuel moisture and clamps to 0-100', () => {
     expect(calculateIgnitionProbability(70, 30, 10)).toBe(75);
     expect(calculateIgnitionProbability(70, 30, 45)).toBe(0);
     expect(calculateIgnitionProbability(70, 30, 0)).toBe(100);
-  });
-});
-
-describe('calculateKBDITrend', () => {
-  it('computes the drought trend estimate', () => {
-    // (100-20)*2 + (95-60)*0.5 = 177.5
-    expect(calculateKBDITrend(95, 20)).toBeCloseTo(177.5, 1);
   });
 });

@@ -146,11 +146,14 @@ export default function SafetyPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
             {[
               { term: 'Ventilation Index (VI)', desc: 'Mixing Height × Transport Wind Speed. Measures atmosphere\'s ability to disperse smoke. >40,000 = good, <20,000 = poor.' },
-              { term: 'KBDI (Keetch-Byram)', desc: 'Long-term drought indicator (0-800). Higher values = drier fuels, faster fire spread.' },
-              { term: 'FFMC (Fine Fuel Moisture)', desc: 'Moisture in 1-hour fuels. >92 = extreme ignition potential.' },
+              { term: 'Dispersion Index (ADI, Lavdas 1986)', desc: 'Stability-aware smoke dispersion index used across the South. Daytime 41+ generally good for burning; <21 poor. Night values run much lower and are read on their own scale.' },
+              { term: 'LVORI (1-10)', desc: 'Low Visibility Occurrence Risk Index: likelihood of smoke/fog visibility hazards on roads, from humidity + Dispersion Index. Caution at 5+; do not burn at 7+ unless fully mopped up by dusk.' },
+              { term: 'KBDI (Keetch-Byram)', desc: 'Cumulative drought index (0-800) computed from observed daily rainfall and temperature. 600+ = severe drought, deep duff consumption likely.' },
+              { term: 'Fosberg FWI', desc: 'Instantaneous fire-weather severity from temperature, humidity, and wind (0-100). 50+ = significant fire weather.' },
+              { term: '1-Hr Fuel Moisture', desc: 'Moisture in fine dead fuels (Simard EMC). Southern Rx guides recommend 7-20%; below ~6% expect spotting and erratic behavior.' },
               { term: 'Haines Index', desc: 'Atmosphere stability and moisture indicator (2-6). ≥5 = elevated large fire potential.' },
               { term: 'Mixing Height', desc: 'Height of convective boundary layer. Higher = better smoke dispersal.' },
-              { term: 'Transport Wind', desc: 'Wind speed through mixing layer. Determines how fast smoke moves away from source.' },
+              { term: 'Transport Wind', desc: 'Wind speed through mixing layer. Determines how fast smoke moves away from source. Note: NWS surface winds are 10-m (~33 ft) values; southern Rx guides reference 20-ft winds, which read slightly lower.' },
             ].map((item) => (
               <div key={item.term} className="border rounded-lg p-3">
                 <p className="font-semibold text-slate-700">{item.term}</p>

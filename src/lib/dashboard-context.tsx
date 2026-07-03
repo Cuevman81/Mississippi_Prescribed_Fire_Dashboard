@@ -51,6 +51,7 @@ interface WeatherGridFields {
   transportWindDirection: GridSeries;
   hainesIndex: GridSeries;
   probabilityOfPrecipitation: GridSeries;
+  ceilingHeight?: GridSeries;
 }
 
 interface WeatherMetadata {
@@ -62,14 +63,22 @@ interface WeatherMetadata {
   state: string;
 }
 import {
-  calculateKBDITrend,
-  calculateFFMC,
+  calculateFFWI,
   calculateFuelMoisture,
   calculateIgnitionProbability,
   determineDispersionCategory,
   assessBurnWindow,
   calculateVentilationIndex,
 } from './fire-science';
+import {
+  solarElevationDeg,
+  netRadiationIndex,
+  stabilityClass,
+  atmosphericDispersionIndex,
+  adiCategory,
+  lvori,
+} from './dispersion';
+import type { KBDIData } from './types';
 
 interface DashboardState {
   // Location
@@ -102,6 +111,9 @@ interface DashboardState {
   currentAQI: AQIObservation[];
   aqiForecast: AQIForecast[];
   aqiMonitors: AQIMonitor[];
+
+  // Drought (real KBDI computed from observed climate data)
+  kbdi: KBDIData | null;
 
   // Actions
   fetchForecast: (locationQuery: string) => Promise<void>;
@@ -137,7 +149,10 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const [weatherGridData, setWeatherGridData] = useState<{
     metadata: WeatherMetadata;
     gridFields: WeatherGridFields;
+    lat: number;
+    lon: number;
   } | null>(null);
+  const [kbdi, setKbdi] = useState<KBDIData | null>(null);
   const [narrativeForecast, setNarrativeForecast] = useState<NarrativePeriod[]>([]);
   const [nwsOffice, setNwsOffice] = useState('');
   const [timezone, setTimezone] = useState('America/Chicago');
@@ -218,12 +233,13 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
 
       setLocation(loc);
 
-      // Step 2: Fetch weather + alerts + air quality in parallel
-      const [weatherRes, aqCurrentRes, aqForecastRes, aqMonitorsRes] = await Promise.all([
+      // Step 2: Fetch weather + alerts + air quality + drought in parallel
+      const [weatherRes, aqCurrentRes, aqForecastRes, aqMonitorsRes, kbdiRes] = await Promise.all([
         fetch(`/api/weather?lat=${loc.lat}&lon=${loc.lon}`),
         fetch(`/api/air-quality?type=current&lat=${loc.lat}&lon=${loc.lon}`),
         fetch(`/api/air-quality?type=forecast&lat=${loc.lat}&lon=${loc.lon}`),
         fetch(`/api/air-quality?type=monitors`),
+        fetch(`/api/kbdi?lat=${loc.lat}&lon=${loc.lon}`),
       ]);
 
       // Process weather data
@@ -234,7 +250,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
 
         setNwsOffice(meta.cwa);
         setTimezone(meta.timeZone || 'America/Chicago');
-        setWeatherGridData({ metadata: meta, gridFields: grid });
+        setWeatherGridData({ metadata: meta, gridFields: grid, lat: loc.lat, lon: loc.lon });
 
         const narr = (weatherData.narrativeForecast?.periods || weatherData.narrativePeriods || []).map((p: {
           name: string;
@@ -272,6 +288,12 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       if (aqCurrentRes.ok) setCurrentAQI(await aqCurrentRes.json());
       if (aqForecastRes.ok) setAqiForecast(await aqForecastRes.json());
       if (aqMonitorsRes.ok) setAqiMonitors(await aqMonitorsRes.json());
+      if (kbdiRes.ok) {
+        const kbdiData = await kbdiRes.json();
+        setKbdi(kbdiData.kbdi != null ? kbdiData : null);
+      } else {
+        setKbdi(null);
+      }
 
       try {
         const stationsData = await fetch('/us_stations.json').then(r => r.json());
@@ -322,7 +344,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const forecast = React.useMemo<HourlyForecast[]>(() => {
     if (!weatherGridData) return [];
 
-    const { metadata: meta, gridFields: grid } = weatherGridData;
+    const { metadata: meta, gridFields: grid, lat, lon } = weatherGridData;
 
     // 1. Expand NWS time series maps for alignment
     const tempSeries = expandNWSTimeSeries(grid.temperature.values, 72);
@@ -338,6 +360,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     const transportDirMap = expandNWSTimeSeriesToMap(grid.transportWindDirection.values);
     const hainesMap = expandNWSTimeSeriesToMap(grid.hainesIndex.values);
     const precipChanceMap = expandNWSTimeSeriesToMap(grid.probabilityOfPrecipitation.values);
+    const ceilingMap = expandNWSTimeSeriesToMap(grid.ceilingHeight?.values || []);
 
     // Weather codes Map
     const weatherCodeMap = new Map<string, string>();
@@ -355,13 +378,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     const hourlyData: HourlyForecast[] = [];
     const numHours = tempSeries.length;
 
-    // Hoist Intl.DateTimeFormat formatters out of the 72-iteration loop for performance
-    const localHourFormatter = new Intl.DateTimeFormat('en-US', {
-      hour: 'numeric',
-      hourCycle: 'h23',
-      timeZone: meta.timeZone || 'America/Chicago',
-    });
-
+    // Hoist Intl.DateTimeFormat formatter out of the 72-iteration loop for performance
     const localTimeFormatter = new Intl.DateTimeFormat('en-US', {
       year: 'numeric',
       month: 'numeric',
@@ -425,11 +442,26 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       const weatherCode = weatherCodeMap.get(time) ?? '';
       const vi = calculateVentilationIndex(mixHeightFt, transSpeedMph);
       const localDate = new Date(time);
-      const localHour = parseInt(localHourFormatter.format(localDate), 10);
 
       const fuelMoisture = calculateFuelMoisture(tempF, rh, prescription.daysSinceRain);
-      const dispersion = determineDispersionCategory(mixHeightFt, transSpeedMph, localHour);
+      const dispersion = determineDispersionCategory(mixHeightFt, transSpeedMph);
       const burnAssessment = assessBurnWindow(tempF, rh, windSpeedMph, windGustMph, mixHeightFt, vi);
+
+      // --- Lavdas ADI + LVORI (see dispersion.ts for sources) ---
+      const solarElev = solarElevationDeg(localDate, lat, lon);
+      const isDay = solarElev > 0;
+      const cloudTenths = Math.round(sky / 10);
+      // NWS ceilingHeight is meters; missing/null means unlimited
+      const ceilingRawM = ceilingMap.get(time);
+      const ceilingFt = ceilingRawM != null ? ceilingRawM * 3.28084 : Infinity;
+      const windKnots = windSpeedMph / 1.15078;
+      const nri = netRadiationIndex(isDay, solarElev, cloudTenths, ceilingFt);
+      const stability = stabilityClass(nri, windKnots);
+      const mixHeightM = mixHeightFt / 3.28084;
+      const transSpeedMs = mphToMs(transSpeedMph);
+      const adi = atmosphericDispersionIndex(isDay, stability, mixHeightM, transSpeedMs);
+      const adiCat = adiCategory(adi, isDay);
+      const lvoriValue = lvori(rh, adi);
 
       hourlyData.push({
         time,
@@ -452,14 +484,17 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         hainesIndex: haines,
         precipChance: Math.round(precip),
         ventilationIndex: vi,
-        kbdiTrend: Math.round(calculateKBDITrend(tempF, rh)),
-        ffmc: Math.round(calculateFFMC(tempF, rh, windSpeedMph) * 10) / 10,
+        ffwi: Math.round(calculateFFWI(tempF, rh, windSpeedMph) * 10) / 10,
         fuelMoisture1hr: Math.round(fuelMoisture.oneHour * 10) / 10,
         fuelMoisture10hr: Math.round(fuelMoisture.tenHour * 10) / 10,
         fuelMoisture100hr: Math.round(fuelMoisture.hundredHour * 10) / 10,
         dispersionCategory: dispersion.category,
         dispersionDescription: dispersion.description,
-        adjustedVI: dispersion.adjustedVI,
+        stabilityClass: stability,
+        adi: Math.round(adi * 10) / 10,
+        adiCategory: adiCat.label,
+        lvori: lvoriValue,
+        isDay,
         burnQuality: burnAssessment.quality,
         burnScore: burnAssessment.score,
         ignitionProbability: Math.round(calculateIgnitionProbability(tempF, rh, fuelMoisture.oneHour)),
@@ -525,6 +560,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         currentAQI,
         aqiForecast,
         aqiMonitors,
+        kbdi,
         fetchForecast,
         fetchForecastByCoords,
       }}
