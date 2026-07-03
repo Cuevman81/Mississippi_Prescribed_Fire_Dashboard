@@ -8,6 +8,39 @@ export async function GET(request: NextRequest) {
   if (limited) return limited;
 
   const query = request.nextUrl.searchParams.get('q');
+  const lat = request.nextUrl.searchParams.get('lat');
+  const lon = request.nextUrl.searchParams.get('lon');
+
+  // Reverse geocoding
+  if (lat && lon) {
+    const latNum = parseFloat(lat);
+    const lonNum = parseFloat(lon);
+    if (isNaN(latNum) || isNaN(lonNum) || latNum < -90 || latNum > 90 || lonNum < -180 || lonNum > 180) {
+      return NextResponse.json({ error: 'Invalid coordinates' }, { status: 400 });
+    }
+
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?lat=${latNum}&lon=${lonNum}&format=json`,
+        {
+          headers: {
+            'User-Agent': process.env.NWS_USER_AGENT || 'PrescribedBurnApp/3.0',
+          },
+        }
+      );
+
+      if (!res.ok) {
+        return NextResponse.json({ error: 'Reverse geocoding failed' }, { status: res.status });
+      }
+
+      const data = await res.json();
+      return NextResponse.json(data);
+    } catch {
+      return NextResponse.json({ error: 'Reverse geocoding service unavailable' }, { status: 500 });
+    }
+  }
+
+  // Forward geocoding
   if (!query || query.length > 100) {
     return NextResponse.json({ error: 'Invalid or missing query parameter (max 100 characters)' }, { status: 400 });
   }

@@ -10,6 +10,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTr
 import { useDashboard } from '@/lib/dashboard-context';
 import { MobileSidebar } from './MobileSidebar';
 import { PRESCRIPTION_PRESETS } from '@/lib/constants';
+import Image from 'next/image';
 
 export function Header() {
   const { isLoading, fetchForecast, location, prescription, setPrescription } = useDashboard();
@@ -179,10 +180,13 @@ export function Header() {
         </Sheet>
 
         {/* MDEQ Logo */}
-        <img
+        <Image
           src="/MDEQ_Logo.gif"
           alt="MDEQ Logo"
+          width={100}
+          height={40}
           className="h-8 sm:h-10 w-auto object-contain"
+          unoptimized
         />
       </div>
     </header>

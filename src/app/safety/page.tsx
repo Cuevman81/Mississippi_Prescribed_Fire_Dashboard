@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -31,7 +31,23 @@ const CHECKLIST = {
 const TOTAL_ITEMS = Object.values(CHECKLIST).flat().length;
 
 export default function SafetyPage() {
-  const [checked, setChecked] = useState<Set<string>>(new Set());
+  const [checked, setChecked] = useState<Set<string>>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('prfi_checklist');
+      if (saved) {
+        try {
+          return new Set(JSON.parse(saved));
+        } catch (e) {
+          console.error('Failed to load checklist', e);
+        }
+      }
+    }
+    return new Set<string>();
+  });
+
+  useEffect(() => {
+    localStorage.setItem('prfi_checklist', JSON.stringify(Array.from(checked)));
+  }, [checked]);
 
   const toggleItem = (item: string) => {
     setChecked((prev) => {

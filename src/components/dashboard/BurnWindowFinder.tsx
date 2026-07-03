@@ -5,14 +5,25 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Clock, Calendar, AlertCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 
+interface BurnWindow {
+    startIndex: number;
+    startTime: Date;
+    endTime: Date;
+    hours: number;
+    temps: number[];
+    rhs: number[];
+    winds: number[];
+    vis: number[];
+}
+
 export function BurnWindowFinder() {
     const { forecast, currentForecastIdx, prescription } = useDashboard();
 
     if (!forecast.length) return null;
 
     // Find contiguous blocks of hours that meet prescription
-    const windows: any[] = [];
-    let currentWindow: any = null;
+    const windows: BurnWindow[] = [];
+    let currentWindow: BurnWindow | null = null;
 
     const startIndex = currentForecastIdx;
     const outlookHours = 72; // Analyze next 72 hours

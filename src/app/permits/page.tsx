@@ -331,8 +331,8 @@ export default function PermitsPage() {
     if (sortConfig !== null) {
       items.sort((a, b) => {
         const key = sortConfig.key as keyof typeof a;
-        let aValue: any = a[key];
-        let bValue: any = b[key];
+        let aValue = a[key] as string | number;
+        let bValue = b[key] as string | number;
 
         // Special handling for derived or combined fields
         if (sortConfig.key === 'type') {
@@ -532,8 +532,9 @@ export default function PermitsPage() {
                   <Scatter
                     data={smokeRiskData}
                     fillOpacity={0.85}
-                    label={(props: any) => {
+                    label={(props: { x?: string | number; y?: string | number; index?: number }) => {
                       const { x, y, index } = props;
+                      if (index === undefined || x === undefined || y === undefined) return null;
                       const d = smokeRiskData[index];
                       if (!d) return null;
 
@@ -542,7 +543,7 @@ export default function PermitsPage() {
                       // Show strong bold label if explicitly selected
                       if (isSelected) {
                         return (
-                          <text x={x} y={y - 18} textAnchor="middle" fontSize={11} fontWeight="bold" fill="#0f172a">
+                          <text x={x} y={Number(y) - 18} textAnchor="middle" fontSize={11} fontWeight="bold" fill="#0f172a">
                             {d.county}
                           </text>
                         );
@@ -551,7 +552,7 @@ export default function PermitsPage() {
                       // Fallback to default small labels if fewer than 12 points and nothing is selected
                       if (smokeRiskData.length <= 12 && !selectedSmokeCounty) {
                         return (
-                          <text x={x} y={y - 12} textAnchor="middle" fontSize={9} fill="#475569">
+                          <text x={x} y={Number(y) - 12} textAnchor="middle" fontSize={9} fill="#475569">
                             {d.county}
                           </text>
                         );
@@ -614,7 +615,7 @@ export default function PermitsPage() {
                     width={175}
                   />
                   <Tooltip
-                    formatter={(value: any, name: any) => [value ?? 0, `Manager: ${name ?? ''}`]}
+                    formatter={(value: unknown, name: unknown) => [String(value ?? 0), `Manager: ${(name as string | number | null) ?? ''}`]}
                     contentStyle={{ fontSize: 12 }}
                   />
                   <Legend wrapperStyle={{ fontSize: 11 }} formatter={(v) => `Certified Manager: ${v}`} />

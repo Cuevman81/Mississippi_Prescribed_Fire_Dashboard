@@ -5,15 +5,9 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useDashboard } from '@/lib/dashboard-context';
 import { formatNumber } from '@/lib/weather-utils';
 import { motion } from 'framer-motion';
-import { useState, useEffect } from 'react';
 
 export function CurrentConditions() {
-  const { forecast, currentForecastIdx, stationObservation, prescription } = useDashboard();
-  const [lastUpdate, setLastUpdate] = useState<string>('');
-
-  useEffect(() => {
-    setLastUpdate(new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }));
-  }, [forecast, stationObservation]);
+  const { forecast, currentForecastIdx, stationObservation, prescription, lastUpdated } = useDashboard();
 
   // Use the forecast hour closest to now (not forecast[0] which may be stale)
   const nowForecast = forecast[currentForecastIdx] || forecast[0];
@@ -95,10 +89,10 @@ export function CurrentConditions() {
           <Calendar size={14} />
           <span>Rx Parameter: {prescription.daysSinceRain} Days Since Rain</span>
         </div>
-        {lastUpdate && (
+        {lastUpdated && (
           <div className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 text-slate-500 rounded-full text-xs font-medium border border-slate-200 ml-auto">
             <RefreshCw size={12} className={stationObservation ? "animate-spin-slow" : ""} />
-            <span>Last Updated: {lastUpdate}</span>
+            <span>Last Updated: {lastUpdated}</span>
           </div>
         )}
       </div>

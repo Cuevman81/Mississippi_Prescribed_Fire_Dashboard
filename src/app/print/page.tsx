@@ -49,7 +49,7 @@ export default function PrintPlanPage() {
       {alerts.length > 0 && (
         <div className="mb-6 space-y-2">
           {alerts.map((alert, i) => {
-            const isCritical = CRITICAL_FIRE_ALERTS.includes(alert.event as any);
+            const isCritical = (CRITICAL_FIRE_ALERTS as readonly string[]).includes(alert.event);
             return (
               <div 
                 key={i} 

@@ -87,6 +87,7 @@ interface DashboardState {
   narrativeForecast: NarrativePeriod[];
   nwsOffice: string;
   timezone: string;
+  lastUpdated: string;
 
   // Alerts
   alerts: AlertInfo[];
@@ -151,6 +152,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const [currentAQI, setCurrentAQI] = useState<AQIObservation[]>([]);
   const [aqiForecast, setAqiForecast] = useState<AQIForecast[]>([]);
   const [aqiMonitors, setAqiMonitors] = useState<AQIMonitor[]>([]);
+  const [lastUpdated, setLastUpdated] = useState<string>('');
 
   // Persist prescription anytime it changes
   React.useEffect(() => {
@@ -172,6 +174,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
           setFireDiscussion(alertData.fireDiscussion || '');
           setZoneForecast(alertData.zoneForecast || '');
           setBurnBanInfo(alertData.burnBanInfo || '');
+          setLastUpdated(new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }));
         }
       } catch (err) {
         console.error('Failed to auto-refresh alerts:', err);
@@ -200,10 +203,8 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
           stateAbbr: ''
         };
       } else {
-        // Reverse geocode
-        const revRes = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`, {
-          headers: { 'User-Agent': 'PrescribedBurnApp/3.0' }
-        });
+        // Reverse geocode via local API
+        const revRes = await fetch(`/api/geocode?lat=${lat}&lon=${lon}`);
         const revData = await revRes.json();
         loc = {
           lat,
@@ -309,6 +310,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         }
       } catch { }
 
+      setLastUpdated(new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
@@ -514,6 +516,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         narrativeForecast,
         nwsOffice,
         timezone,
+        lastUpdated,
         alerts,
         fireDiscussion,
         zoneForecast,
