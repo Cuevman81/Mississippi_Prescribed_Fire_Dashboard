@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(request: NextRequest) {
   const query = request.nextUrl.searchParams.get('q');
-  if (!query) {
-    return NextResponse.json({ error: 'Missing query parameter' }, { status: 400 });
+  if (!query || query.length > 100) {
+    return NextResponse.json({ error: 'Invalid or missing query parameter (max 100 characters)' }, { status: 400 });
   }
 
   try {

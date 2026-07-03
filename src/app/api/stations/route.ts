@@ -3,8 +3,8 @@ import { NextRequest, NextResponse } from 'next/server';
 export async function GET(request: NextRequest) {
   const stationId = request.nextUrl.searchParams.get('id');
 
-  if (!stationId) {
-    return NextResponse.json({ error: 'Missing station ID' }, { status: 400 });
+  if (!stationId || !/^[A-Za-z0-9_]{3,10}$/.test(stationId)) {
+    return NextResponse.json({ error: 'Invalid station ID' }, { status: 400 });
   }
 
   try {

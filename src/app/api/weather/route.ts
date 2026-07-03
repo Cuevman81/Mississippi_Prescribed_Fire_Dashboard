@@ -13,6 +13,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Missing lat/lon' }, { status: 400 });
   }
 
+  const latNum = parseFloat(lat);
+  const lonNum = parseFloat(lon);
+  if (isNaN(latNum) || isNaN(lonNum) || latNum < -90 || latNum > 90 || lonNum < -180 || lonNum > 180) {
+    return NextResponse.json({ error: 'Invalid coordinates' }, { status: 400 });
+  }
+
   try {
     // Step 1: Get point metadata (NWS office, grid, timezone)
     const pointRes = await fetch(
@@ -53,20 +59,20 @@ export async function GET(request: NextRequest) {
       narrativePeriods = forecastData.properties?.periods || [];
     }
 
-    // Extract grid data time series
+    // Extract grid data time series with uom
     const gridFields = {
-      temperature: gp.temperature?.values || [],
-      relativeHumidity: gp.relativeHumidity?.values || [],
-      windSpeed: gp.windSpeed?.values || [],
-      windDirection: gp.windDirection?.values || [],
-      windGust: gp.windGust?.values || [],
-      skyCover: gp.skyCover?.values || [],
-      weather: gp.weather?.values || [],
-      mixingHeight: gp.mixingHeight?.values || [],
-      transportWindSpeed: gp.transportWindSpeed?.values || [],
-      transportWindDirection: gp.transportWindDirection?.values || [],
-      hainesIndex: gp.hainesIndex?.values || [],
-      probabilityOfPrecipitation: gp.probabilityOfPrecipitation?.values || [],
+      temperature: { values: gp.temperature?.values || [], uom: gp.temperature?.uom || '' },
+      relativeHumidity: { values: gp.relativeHumidity?.values || [], uom: gp.relativeHumidity?.uom || '' },
+      windSpeed: { values: gp.windSpeed?.values || [], uom: gp.windSpeed?.uom || '' },
+      windDirection: { values: gp.windDirection?.values || [], uom: gp.windDirection?.uom || '' },
+      windGust: { values: gp.windGust?.values || [], uom: gp.windGust?.uom || '' },
+      skyCover: { values: gp.skyCover?.values || [], uom: gp.skyCover?.uom || '' },
+      weather: { values: gp.weather?.values || [], uom: gp.weather?.uom || '' },
+      mixingHeight: { values: gp.mixingHeight?.values || [], uom: gp.mixingHeight?.uom || '' },
+      transportWindSpeed: { values: gp.transportWindSpeed?.values || [], uom: gp.transportWindSpeed?.uom || '' },
+      transportWindDirection: { values: gp.transportWindDirection?.values || [], uom: gp.transportWindDirection?.uom || '' },
+      hainesIndex: { values: gp.hainesIndex?.values || [], uom: gp.hainesIndex?.uom || '' },
+      probabilityOfPrecipitation: { values: gp.probabilityOfPrecipitation?.values || [], uom: gp.probabilityOfPrecipitation?.uom || '' },
     };
 
     return NextResponse.json({

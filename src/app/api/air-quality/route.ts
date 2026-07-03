@@ -7,7 +7,20 @@ export async function GET(request: NextRequest) {
   const type = request.nextUrl.searchParams.get('type'); // current | forecast | monitors
   const lat = request.nextUrl.searchParams.get('lat');
   const lon = request.nextUrl.searchParams.get('lon');
+  if (type !== 'current' && type !== 'forecast' && type !== 'monitors') {
+    return NextResponse.json({ error: 'Invalid type. Use current, forecast, or monitors' }, { status: 400 });
+  }
 
+  if (type === 'current' || type === 'forecast') {
+    if (!lat || !lon) {
+      return NextResponse.json({ error: 'Missing lat/lon' }, { status: 400 });
+    }
+    const latNum = parseFloat(lat);
+    const lonNum = parseFloat(lon);
+    if (isNaN(latNum) || isNaN(lonNum) || latNum < -90 || latNum > 90 || lonNum < -180 || lonNum > 180) {
+      return NextResponse.json({ error: 'Invalid coordinates' }, { status: 400 });
+    }
+  }
   if (!API_KEY) {
     return NextResponse.json({ error: 'AirNow API key not configured' }, { status: 500 });
   }

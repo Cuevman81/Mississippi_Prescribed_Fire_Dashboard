@@ -2,7 +2,7 @@
 
 import { AlertTriangle, Ban, Flame } from 'lucide-react';
 import { useDashboard } from '@/lib/dashboard-context';
-import { FFMC_THRESHOLDS } from '@/lib/constants';
+import { FFMC_THRESHOLDS, CRITICAL_FIRE_ALERTS } from '@/lib/constants';
 
 export function AlertBanner() {
   const { alerts, burnBanInfo, forecast, currentForecastIdx } = useDashboard();
@@ -53,7 +53,7 @@ export function AlertBanner() {
       )}
 
       {alerts.map((alert, i) => {
-        const isCriticalFire = ['Red Flag Warning', 'Fire Weather Watch', 'Extreme Fire Danger', 'Fire Warning'].includes(alert.event);
+        const isCriticalFire = (CRITICAL_FIRE_ALERTS as readonly string[]).includes(alert.event);
 
         if (isCriticalFire) {
           return (

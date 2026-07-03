@@ -3,6 +3,7 @@
 import { CheckCircle2, XCircle, Info } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { useDashboard } from '@/lib/dashboard-context';
+import { CRITICAL_FIRE_ALERTS } from '@/lib/constants';
 import { motion } from 'framer-motion';
 
 export function BurnStatusSummary() {
@@ -15,7 +16,7 @@ export function BurnStatusSummary() {
 
   // Check for critical fire weather alerts
   const criticalAlerts = alerts.filter(a =>
-    ['Red Flag Warning', 'Fire Weather Watch', 'Extreme Fire Danger', 'Fire Warning'].includes(a.event)
+    (CRITICAL_FIRE_ALERTS as readonly string[]).includes(a.event)
   );
 
   if (criticalAlerts.length > 0) {

@@ -14,16 +14,53 @@ import type {
 } from './types';
 import { DEFAULT_PRESCRIPTION } from './constants';
 import {
-  celsiusToFahrenheit,
-  kmhToMph,
-  knotsToMph,
-  metersToFeet,
   mphToMs,
   degreesToCardinal,
   getSkyCoverAbbr,
   getWeatherAbbr,
   expandNWSTimeSeries,
+  expandNWSTimeSeriesToMap,
+  convertNWSValue,
+  parseISODuration,
 } from './weather-utils';
+
+interface GridSeries {
+  values: Array<{ validTime: string; value: number }>;
+  uom: string;
+}
+
+interface WeatherGridFields {
+  temperature: GridSeries;
+  relativeHumidity: GridSeries;
+  windSpeed: GridSeries;
+  windDirection: GridSeries;
+  windGust: GridSeries;
+  skyCover: GridSeries;
+  weather: {
+    values: Array<{
+      validTime: string;
+      value: Array<{
+        weather?: string;
+        [key: string]: unknown;
+      }>;
+    }>;
+    uom: string;
+  };
+  mixingHeight: GridSeries;
+  transportWindSpeed: GridSeries;
+  transportWindDirection: GridSeries;
+  hainesIndex: GridSeries;
+  probabilityOfPrecipitation: GridSeries;
+}
+
+interface WeatherMetadata {
+  cwa: string;
+  forecastGridData: string;
+  timeZone: string;
+  forecastUrl: string;
+  county: string;
+  state: string;
+}
 import {
   calculateKBDITrend,
   calculateFFMC,
@@ -96,12 +133,10 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     return DEFAULT_PRESCRIPTION;
   });
 
-  // Persist prescription anytime it changes
-  React.useEffect(() => {
-    localStorage.setItem('prfi_prescription', JSON.stringify(prescription));
-  }, [prescription]);
-
-  const [forecast, setForecast] = useState<HourlyForecast[]>([]);
+  const [weatherGridData, setWeatherGridData] = useState<{
+    metadata: WeatherMetadata;
+    gridFields: WeatherGridFields;
+  } | null>(null);
   const [narrativeForecast, setNarrativeForecast] = useState<NarrativePeriod[]>([]);
   const [nwsOffice, setNwsOffice] = useState('');
   const [timezone, setTimezone] = useState('America/Chicago');
@@ -116,6 +151,36 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const [currentAQI, setCurrentAQI] = useState<AQIObservation[]>([]);
   const [aqiForecast, setAqiForecast] = useState<AQIForecast[]>([]);
   const [aqiMonitors, setAqiMonitors] = useState<AQIMonitor[]>([]);
+
+  // Persist prescription anytime it changes
+  React.useEffect(() => {
+    localStorage.setItem('prfi_prescription', JSON.stringify(prescription));
+  }, [prescription]);
+
+  // Auto-refresh alerts every 5 minutes
+  React.useEffect(() => {
+    if (!location) return;
+
+    const refreshAlerts = async () => {
+      try {
+        const alertsWithOffice = await fetch(
+          `/api/alerts?lat=${location.lat}&lon=${location.lon}&office=${nwsOffice}`
+        );
+        if (alertsWithOffice.ok) {
+          const alertData = await alertsWithOffice.json();
+          setAlerts(alertData.alerts || []);
+          setFireDiscussion(alertData.fireDiscussion || '');
+          setZoneForecast(alertData.zoneForecast || '');
+          setBurnBanInfo(alertData.burnBanInfo || '');
+        }
+      } catch (err) {
+        console.error('Failed to auto-refresh alerts:', err);
+      }
+    };
+
+    const interval = setInterval(refreshAlerts, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [location, nwsOffice]);
 
   const fetchForecastByCoords = useCallback(async (lat: number, lon: number, displayName?: string) => {
     setIsLoading(true);
@@ -168,102 +233,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
 
         setNwsOffice(meta.cwa);
         setTimezone(meta.timeZone || 'America/Chicago');
-
-        // Expand NWS time series
-        const temps = expandNWSTimeSeries(grid.temperature, 72);
-        const humidities = expandNWSTimeSeries(grid.relativeHumidity, 72);
-        const windSpeeds = expandNWSTimeSeries(grid.windSpeed, 72);
-        const windDirs = expandNWSTimeSeries(grid.windDirection, 72);
-        const windGusts = expandNWSTimeSeries(grid.windGust, 72);
-        const skyCovers = expandNWSTimeSeries(grid.skyCover, 72);
-        const mixingHeights = expandNWSTimeSeries(grid.mixingHeight, 72);
-        const transportSpeeds = expandNWSTimeSeries(grid.transportWindSpeed, 72);
-        const transportDirs = expandNWSTimeSeries(grid.transportWindDirection, 72);
-        const hainesIndices = expandNWSTimeSeries(grid.hainesIndex, 72);
-        const precipChances = expandNWSTimeSeries(grid.probabilityOfPrecipitation, 72);
-
-        // Process weather codes
-        const weatherCodes: Array<{ time: string; value: string }> = [];
-        for (const entry of grid.weather || []) {
-          const [timeStr, durationStr] = entry.validTime.split('/');
-          const startTime = new Date(timeStr);
-          const hours = parseInt(durationStr.match(/PT(\d+)H/)?.[1] || '1');
-          const code = entry.value?.[0]?.weather || '';
-          for (let h = 0; h < hours; h++) {
-            const time = new Date(startTime.getTime() + h * 3600000);
-            weatherCodes.push({ time: time.toISOString(), value: code });
-          }
-        }
-
-        const hourlyData: HourlyForecast[] = [];
-        const numHours = Math.min(72, temps.length);
-
-        for (let i = 0; i < numHours; i++) {
-          const time = temps[i]?.time;
-          if (!time) continue;
-
-          const tempC = temps[i]?.value ?? 0;
-          const tempF = celsiusToFahrenheit(tempC);
-          const rh = humidities[i]?.value ?? 0;
-          const windSpeedKmh = windSpeeds[i]?.value ?? 0;
-          const windSpeedMph = kmhToMph(windSpeedKmh);
-          const windDir = windDirs[i]?.value ?? 0;
-          const windGustKmh = windGusts[i]?.value ?? 0;
-          const windGustMph = kmhToMph(windGustKmh);
-          const sky = skyCovers[i]?.value ?? 0;
-          const mixHeightM = mixingHeights[i]?.value ?? 0;
-          const mixHeightFt = metersToFeet(mixHeightM);
-          const transSpeedKnots = transportSpeeds[i]?.value ?? 0;
-          const transSpeedMph = knotsToMph(transSpeedKnots);
-          const transDir = transportDirs[i]?.value ?? 0;
-          const haines = hainesIndices[i]?.value ?? 0;
-          const precip = precipChances[i]?.value ?? 0;
-          const weatherCode = weatherCodes[i]?.value ?? '';
-
-          const vi = calculateVentilationIndex(mixHeightFt, transSpeedMph);
-          const localDate = new Date(time);
-          const hour = localDate.getUTCHours();
-
-          const fuelMoisture = calculateFuelMoisture(tempF, rh, prescription.daysSinceRain);
-          const dispersion = determineDispersionCategory(mixHeightFt, transSpeedMph, hour);
-          const burnAssessment = assessBurnWindow(tempF, rh, windSpeedMph, windGustMph, mixHeightFt, vi);
-
-          hourlyData.push({
-            time,
-            localTime: localDate.toLocaleString('en-US', { timeZone: meta.timeZone || 'America/Chicago' }),
-            temp: Math.round(tempF),
-            humidity: Math.round(rh),
-            windSpeed: Math.round(windSpeedMph * 10) / 10,
-            windGust: Math.round(windGustMph * 10) / 10,
-            windDirection: windDir,
-            windDirectionCardinal: degreesToCardinal(windDir),
-            skyCover: Math.round(sky),
-            skyCoverAbbr: getSkyCoverAbbr(sky),
-            weatherCode,
-            weatherAbbr: getWeatherAbbr(weatherCode),
-            mixingHeight: Math.round(mixHeightFt),
-            transportWindSpeed: Math.round(transSpeedMph * 10) / 10,
-            transportWindSpeedMs: Math.round(mphToMs(transSpeedMph) * 10) / 10,
-            transportWindDirection: transDir,
-            transportWindDirectionCardinal: degreesToCardinal(transDir),
-            hainesIndex: haines,
-            precipChance: Math.round(precip),
-            ventilationIndex: vi,
-            kbdiTrend: Math.round(calculateKBDITrend(tempF, rh)),
-            ffmc: Math.round(calculateFFMC(tempF, rh, windSpeedMph) * 10) / 10,
-            fuelMoisture1hr: Math.round(fuelMoisture.oneHour * 10) / 10,
-            fuelMoisture10hr: Math.round(fuelMoisture.tenHour * 10) / 10,
-            fuelMoisture100hr: Math.round(fuelMoisture.hundredHour * 10) / 10,
-            dispersionCategory: dispersion.category,
-            dispersionDescription: dispersion.description,
-            adjustedVI: dispersion.adjustedVI,
-            burnQuality: burnAssessment.quality,
-            burnScore: burnAssessment.score,
-            ignitionProbability: Math.round(calculateIgnitionProbability(tempF, rh, fuelMoisture.oneHour)),
-          });
-        }
-
-        setForecast(hourlyData);
+        setWeatherGridData({ metadata: meta, gridFields: grid });
 
         const narr = (weatherData.narrativeForecast?.periods || weatherData.narrativePeriods || []).map((p: {
           name: string;
@@ -344,7 +314,158 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [prescription.daysSinceRain]);
+  }, []);
+
+  // Memoized forecast computation that recalculates when weatherGridData or daysSinceRain changes
+  const forecast = React.useMemo<HourlyForecast[]>(() => {
+    if (!weatherGridData) return [];
+
+    const { metadata: meta, gridFields: grid } = weatherGridData;
+
+    // 1. Expand NWS time series maps for alignment
+    const tempSeries = expandNWSTimeSeries(grid.temperature.values, 72);
+    if (!tempSeries.length) return [];
+
+    const rhMap = expandNWSTimeSeriesToMap(grid.relativeHumidity.values);
+    const windSpeedMap = expandNWSTimeSeriesToMap(grid.windSpeed.values);
+    const windDirMap = expandNWSTimeSeriesToMap(grid.windDirection.values);
+    const windGustMap = expandNWSTimeSeriesToMap(grid.windGust.values);
+    const skyCoverMap = expandNWSTimeSeriesToMap(grid.skyCover.values);
+    const mixingHeightMap = expandNWSTimeSeriesToMap(grid.mixingHeight.values);
+    const transportSpeedMap = expandNWSTimeSeriesToMap(grid.transportWindSpeed.values);
+    const transportDirMap = expandNWSTimeSeriesToMap(grid.transportWindDirection.values);
+    const hainesMap = expandNWSTimeSeriesToMap(grid.hainesIndex.values);
+    const precipChanceMap = expandNWSTimeSeriesToMap(grid.probabilityOfPrecipitation.values);
+
+    // Weather codes Map
+    const weatherCodeMap = new Map<string, string>();
+    for (const entry of grid.weather.values || []) {
+      const [timeStr, durationStr] = entry.validTime.split('/');
+      const startTime = new Date(timeStr);
+      const hours = parseISODuration(durationStr);
+      const code = entry.value?.[0]?.weather || '';
+      for (let h = 0; h < hours; h++) {
+        const time = new Date(startTime.getTime() + h * 3600000);
+        weatherCodeMap.set(time.toISOString(), code);
+      }
+    }
+
+    const hourlyData: HourlyForecast[] = [];
+    const numHours = tempSeries.length;
+
+    // Hoist Intl.DateTimeFormat formatters out of the 72-iteration loop for performance
+    const localHourFormatter = new Intl.DateTimeFormat('en-US', {
+      hour: 'numeric',
+      hourCycle: 'h23',
+      timeZone: meta.timeZone || 'America/Chicago',
+    });
+
+    const localTimeFormatter = new Intl.DateTimeFormat('en-US', {
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: 'numeric',
+      second: 'numeric',
+      timeZone: meta.timeZone || 'America/Chicago',
+    });
+
+    // Fallback variables to carry last known values if NWS data is missing for tail hours
+    let lastWindSpeed = 0;
+    let lastWindDir = 0;
+    let lastWindGust = 0;
+    let lastSky = 0;
+    let lastMixHeight = 1000;
+    let lastTransSpeed = 0;
+    let lastTransDir = 0;
+    let lastHaines = 4;
+    let lastPrecip = 0;
+
+    for (let i = 0; i < numHours; i++) {
+      const time = tempSeries[i].time;
+      const tempC = tempSeries[i].value;
+      const rh = rhMap.get(time);
+
+      // Skip hours where temperature or relative humidity is missing (or null) to prevent false alerts
+      if (tempC == null || rh == null) {
+        continue;
+      }
+
+      // Carry forward last known values if fields are missing (or null) at the tail of the NWS forecast
+      const windSpeedRaw = windSpeedMap.get(time) ?? lastWindSpeed;
+      const windDir = windDirMap.get(time) ?? lastWindDir;
+      const windGustRaw = windGustMap.get(time) ?? lastWindGust;
+      const sky = skyCoverMap.get(time) ?? lastSky;
+      const mixHeightRaw = mixingHeightMap.get(time) ?? lastMixHeight;
+      const transSpeedRaw = transportSpeedMap.get(time) ?? lastTransSpeed;
+      const transDir = transportDirMap.get(time) ?? lastTransDir;
+      const haines = hainesMap.get(time) ?? lastHaines;
+      const precip = precipChanceMap.get(time) ?? lastPrecip;
+
+      // Update state history tracking
+      lastWindSpeed = windSpeedRaw;
+      lastWindDir = windDir;
+      lastWindGust = windGustRaw;
+      lastSky = sky;
+      lastMixHeight = mixHeightRaw;
+      lastTransSpeed = transSpeedRaw;
+      lastTransDir = transDir;
+      lastHaines = haines;
+      lastPrecip = precip;
+
+      // Dynamic unit conversions using convertNWSValue based on original NWS uom strings
+      const tempF = convertNWSValue(tempC, grid.temperature.uom, 'F');
+      const windSpeedMph = convertNWSValue(windSpeedRaw, grid.windSpeed.uom, 'mph');
+      const windGustMph = convertNWSValue(windGustRaw, grid.windGust.uom, 'mph');
+      const mixHeightFt = convertNWSValue(mixHeightRaw, grid.mixingHeight.uom, 'ft');
+      const transSpeedMph = convertNWSValue(transSpeedRaw, grid.transportWindSpeed.uom, 'mph');
+
+      const weatherCode = weatherCodeMap.get(time) ?? '';
+      const vi = calculateVentilationIndex(mixHeightFt, transSpeedMph);
+      const localDate = new Date(time);
+      const localHour = parseInt(localHourFormatter.format(localDate), 10);
+
+      const fuelMoisture = calculateFuelMoisture(tempF, rh, prescription.daysSinceRain);
+      const dispersion = determineDispersionCategory(mixHeightFt, transSpeedMph, localHour);
+      const burnAssessment = assessBurnWindow(tempF, rh, windSpeedMph, windGustMph, mixHeightFt, vi);
+
+      hourlyData.push({
+        time,
+        localTime: localTimeFormatter.format(localDate),
+        temp: Math.round(tempF),
+        humidity: Math.round(rh),
+        windSpeed: Math.round(windSpeedMph * 10) / 10,
+        windGust: Math.round(windGustMph * 10) / 10,
+        windDirection: windDir,
+        windDirectionCardinal: degreesToCardinal(windDir),
+        skyCover: Math.round(sky),
+        skyCoverAbbr: getSkyCoverAbbr(sky),
+        weatherCode,
+        weatherAbbr: getWeatherAbbr(weatherCode),
+        mixingHeight: Math.round(mixHeightFt),
+        transportWindSpeed: Math.round(transSpeedMph * 10) / 10,
+        transportWindSpeedMs: Math.round(mphToMs(transSpeedMph) * 10) / 10,
+        transportWindDirection: transDir,
+        transportWindDirectionCardinal: degreesToCardinal(transDir),
+        hainesIndex: haines,
+        precipChance: Math.round(precip),
+        ventilationIndex: vi,
+        kbdiTrend: Math.round(calculateKBDITrend(tempF, rh)),
+        ffmc: Math.round(calculateFFMC(tempF, rh, windSpeedMph) * 10) / 10,
+        fuelMoisture1hr: Math.round(fuelMoisture.oneHour * 10) / 10,
+        fuelMoisture10hr: Math.round(fuelMoisture.tenHour * 10) / 10,
+        fuelMoisture100hr: Math.round(fuelMoisture.hundredHour * 10) / 10,
+        dispersionCategory: dispersion.category,
+        dispersionDescription: dispersion.description,
+        adjustedVI: dispersion.adjustedVI,
+        burnQuality: burnAssessment.quality,
+        burnScore: burnAssessment.score,
+        ignitionProbability: Math.round(calculateIgnitionProbability(tempF, rh, fuelMoisture.oneHour)),
+      });
+    }
+
+    return hourlyData;
+  }, [weatherGridData, prescription.daysSinceRain]);
 
   const fetchForecast = useCallback(async (locationQuery: string) => {
     setIsLoading(true);

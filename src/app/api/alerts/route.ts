@@ -14,6 +14,16 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Missing lat/lon' }, { status: 400 });
   }
 
+  const latNum = parseFloat(lat);
+  const lonNum = parseFloat(lon);
+  if (isNaN(latNum) || isNaN(lonNum) || latNum < -90 || latNum > 90 || lonNum < -180 || lonNum > 180) {
+    return NextResponse.json({ error: 'Invalid coordinates' }, { status: 400 });
+  }
+
+  if (nwsOffice && !/^[A-Za-z0-9]{3,10}$/.test(nwsOffice)) {
+    return NextResponse.json({ error: 'Invalid office parameter' }, { status: 400 });
+  }
+
   try {
     // Get forecast zone for alert checking
     const pointRes = await fetch(
@@ -44,7 +54,13 @@ export async function GET(request: NextRequest) {
           alerts = (alertsData.features || [])
             .filter((f: { properties: { event: string } }) => {
               const evt = f.properties.event.toLowerCase();
-              return evt.includes('red flag') || evt.includes('fire weather') || evt.includes('wind');
+              return (
+                evt.includes('red flag') ||
+                evt.includes('fire weather') ||
+                evt.includes('wind') ||
+                evt.includes('heat') ||
+                evt.includes('air quality')
+              );
             })
             .map((f: { properties: Record<string, unknown> }) => ({
               event: f.properties.event,

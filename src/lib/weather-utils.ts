@@ -75,8 +75,79 @@ export function formatNumber(num: number): string {
 
 /** Parse NWS ISO duration (e.g., "PT1H" = 1 hour) */
 export function parseISODuration(duration: string): number {
-  const match = duration.match(/PT(\d+)H/);
-  return match ? parseInt(match[1]) : 1;
+  // Parse ISO 8601 duration: PT1H, PT2H, P1D, P1DT6H, etc.
+  const match = duration.match(/P(?:(\d+)D)?(?:T(\d+)H)?/);
+  if (!match) return 1;
+  const days = parseInt(match[1] || '0', 10);
+  const hours = parseInt(match[2] || '0', 10);
+  const totalHours = days * 24 + hours;
+  return totalHours > 0 ? totalHours : 1;
+}
+
+/** Convert NWS values based on their Unit of Measure (uom) */
+export function convertNWSValue(
+  value: number,
+  uom: string | undefined,
+  targetUnit: 'F' | 'mph' | 'ft' | 'percent'
+): number {
+  if (!uom) {
+    if (targetUnit === 'F') return celsiusToFahrenheit(value);
+    if (targetUnit === 'mph') return kmhToMph(value);
+    if (targetUnit === 'ft') return metersToFeet(value);
+    return value;
+  }
+
+  const unit = uom.replace('wmoUnit:', '');
+  switch (targetUnit) {
+    case 'F':
+      if (unit === 'degC') {
+        return celsiusToFahrenheit(value);
+      }
+      return value;
+    case 'mph':
+      if (unit === 'km_h-1') {
+        return kmhToMph(value);
+      }
+      if (unit === 'm_s-1') {
+        return value * 2.23694; // m/s to mph
+      }
+      if (unit === 'nmi_h-1' || unit === 'kt') {
+        return knotsToMph(value);
+      }
+      return value;
+    case 'ft':
+      if (unit === 'm') {
+        return metersToFeet(value);
+      }
+      return value;
+    case 'percent':
+      return value;
+    default:
+      return value;
+  }
+}
+
+/**
+ * Parse NWS grid data time series into a Map of ISO hour timestamp -> value
+ */
+export function expandNWSTimeSeriesToMap(
+  values: Array<{ validTime: string; value: number }>
+): Map<string, number> {
+  const map = new Map<string, number>();
+  if (!values) return map;
+
+  for (const entry of values) {
+    const [timeStr, durationStr] = entry.validTime.split('/');
+    const startTime = new Date(timeStr);
+    const hours = parseISODuration(durationStr);
+
+    for (let h = 0; h < hours; h++) {
+      const time = new Date(startTime.getTime() + h * 3600000);
+      map.set(time.toISOString(), entry.value);
+    }
+  }
+
+  return map;
 }
 
 /**

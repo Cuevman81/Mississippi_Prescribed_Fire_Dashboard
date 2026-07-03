@@ -8,7 +8,7 @@ A comprehensive web-based decision support tool for prescribed fire managers, pr
 
 ### 1. Real-Time Operational Dashboard
 *   **Burn Status Summary:** Instant "Within/Outside Prescription" status with specific reasons for sub-optimal conditions. 
-*   **Critical Fire Alerts:** High-priority "Veto" logic that automatically flags the burn as RESTRICTED during NWS Fire Weather Watches and Red Flag Warnings.
+*   **Critical Fire Alerts:** High-priority "Veto" logic that automatically flags the burn as RESTRICTED during NWS Fire Weather Watches, Red Flag Warnings, and Excessive Heat Warnings. Alerts auto-refresh every 5 minutes so warnings issued mid-session appear without reloading.
 *   **Interactive Location Map:** Click-to-set location functionality to get pinpoint forecasts for any burn unit.
 *   **Current Conditions:** Real-time data from the nearest ASOS/AWOS weather stations integrated with NWS high-resolution grid forecasts.
 
@@ -40,6 +40,13 @@ No installation or technical setup is required for end users. Simply open the li
 *   **Mapping:** Leaflet & React-Leaflet
 *   **Visualization:** Recharts (Dynamic Fire Density & Smoke Scattering)
 *   **Data Sources:** NWS API, EPA AirNow, NOAA HMS, U.S. Drought Monitor, MFC.
+
+### Data Integrity & Security
+
+*   **Unit-aware NWS conversions:** All grid values (transport wind, mixing height, temperature) are converted using the unit-of-measure (`uom`) declared by the NWS API rather than hardcoded assumptions, so the Ventilation Index and dispersion categories match official data exactly.
+*   **Timestamp-aligned forecasts:** NWS time series are joined by timestamp (not array index), correctly handling multi-hour and multi-day duration encodings and gaps in grid coverage.
+*   **Timezone-correct dispersion modeling:** Atmospheric stability adjustments use the forecast location's local hour.
+*   **Hardened API layer:** All API routes validate coordinates, station IDs, dates, and payload sizes; security headers (X-Frame-Options, nosniff, Referrer-Policy) are applied site-wide.
 
 ## 📄 Disclaimer
 This dashboard is a decision-support tool only. All burn decisions must be made by qualified prescribed fire managers using current field conditions. Always verify conditions on-site before ignition.

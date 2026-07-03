@@ -30,7 +30,16 @@ export function BurnWindowFinder() {
             f.windSpeed <= prescription.windSpeedMax &&
             f.ventilationIndex >= prescription.minVentilationIndex;
 
-        if (isGood) {
+        let isContiguous = true;
+        if (currentWindow) {
+            const prevTime = currentWindow.endTime.getTime();
+            const currTime = new Date(f.time).getTime();
+            if (currTime - prevTime > 3600000) {
+                isContiguous = false;
+            }
+        }
+
+        if (isGood && isContiguous) {
             if (!currentWindow) {
                 currentWindow = {
                     startIndex: i,
@@ -57,6 +66,19 @@ export function BurnWindowFinder() {
                     windows.push(currentWindow);
                 }
                 currentWindow = null;
+            }
+
+            if (isGood) {
+                currentWindow = {
+                    startIndex: i,
+                    startTime: new Date(f.time),
+                    endTime: new Date(f.time),
+                    hours: 1,
+                    temps: [f.temp],
+                    rhs: [f.humidity],
+                    winds: [f.windSpeed],
+                    vis: [f.ventilationIndex]
+                };
             }
         }
     }

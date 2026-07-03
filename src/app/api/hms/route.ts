@@ -3,7 +3,13 @@ import shp from 'shpjs';
 
 export async function GET(request: NextRequest) {
   const dateParam = request.nextUrl.searchParams.get('date');
+  if (dateParam && !/^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
+    return NextResponse.json({ error: 'Invalid date format. Use YYYY-MM-DD' }, { status: 400 });
+  }
   const date = dateParam ? new Date(dateParam) : new Date();
+  if (isNaN(date.getTime())) {
+    return NextResponse.json({ error: 'Invalid date' }, { status: 400 });
+  }
 
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -62,6 +68,10 @@ export async function GET(request: NextRequest) {
       fires: firePoints,
       smoke: smokeGeoJSON,
       date: `${year}-${month}-${day}`,
+    }, {
+      headers: {
+        'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=300'
+      }
     });
   } catch (err) {
     console.error('HMS API error:', err);
@@ -75,7 +85,7 @@ export async function GET(request: NextRequest) {
 }
 
 async function fetchAndParseShapefile(url: string): Promise<GeoJSON.FeatureCollection | null> {
-  const res = await fetch(url);
+  const res = await fetch(url, { next: { revalidate: 3600 } });
   if (!res.ok) return null;
 
   const buffer = await res.arrayBuffer();

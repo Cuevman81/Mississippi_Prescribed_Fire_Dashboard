@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { convertNWSValue, parseISODuration } from '@/lib/weather-utils';
 
 const NWS_UA = process.env.NWS_USER_AGENT || 'PrescribedBurnApp/3.0';
 
@@ -32,6 +33,24 @@ export async function POST(request: NextRequest) {
 
     if (!counties || !counties.length) {
       return NextResponse.json({});
+    }
+
+    // Size limit to prevent DoS attacks
+    if (counties.length > 100) {
+      return NextResponse.json({ error: 'Too many counties (maximum 100)' }, { status: 400 });
+    }
+
+    // Data type and range verification
+    for (const entry of counties) {
+      if (!entry.county || typeof entry.county !== 'string' || entry.county.length > 100) {
+        return NextResponse.json({ error: 'Invalid county name' }, { status: 400 });
+      }
+      if (typeof entry.lat !== 'number' || isNaN(entry.lat) || entry.lat < -90 || entry.lat > 90) {
+        return NextResponse.json({ error: 'Invalid latitude value' }, { status: 400 });
+      }
+      if (typeof entry.lon !== 'number' || isNaN(entry.lon) || entry.lon < -180 || entry.lon > 180) {
+        return NextResponse.json({ error: 'Invalid longitude value' }, { status: 400 });
+      }
     }
 
     const result: Record<string, CountyWeather> = {};
@@ -78,8 +97,8 @@ export async function POST(request: NextRequest) {
           for (const entry of series.values) {
             const [start, duration] = entry.validTime.split('/');
             const startMs = new Date(start).getTime();
-            // Parse ISO 8601 duration (simplified: hours)
-            const hours = parseDurationHours(duration);
+            // Parse ISO 8601 duration
+            const hours = parseISODuration(duration);
             const endMs = startMs + hours * 3600000;
 
             if (now >= startMs && now < endMs) {
@@ -100,19 +119,22 @@ export async function POST(request: NextRequest) {
           return bestVal;
         };
 
-        // Extract current values
-        const windSpeedKmh = getValue(props.windSpeed);
-        const windGustKmh = getValue(props.windGust);
-        const windDirDeg = getValue(props.windDirection);
-        const mixingHeightM = getValue(props.mixingHeight);
-        const transportWindMs = getValue(props.transportWindSpeed);
-        const transportWindDir = getValue(props.transportWindDirection);
+        // Extract current values with dynamic conversions based on uom
+        const windSpeedRaw = getValue(props.windSpeed);
+        const windSpeedMph = Math.round(convertNWSValue(windSpeedRaw, props.windSpeed?.uom, 'mph'));
 
-        // Convert units
-        const windSpeedMph = Math.round(windSpeedKmh * 0.621371);
-        const windGustMph = Math.round(windGustKmh * 0.621371);
-        const mixingHeightFt = Math.round(mixingHeightM * 3.28084);
-        const transportWindMph = Math.round(transportWindMs * 2.23694);
+        const windGustRaw = getValue(props.windGust);
+        const windGustMph = Math.round(convertNWSValue(windGustRaw, props.windGust?.uom, 'mph'));
+
+        const windDirDeg = getValue(props.windDirection);
+
+        const mixingHeightRaw = getValue(props.mixingHeight);
+        const mixingHeightFt = Math.round(convertNWSValue(mixingHeightRaw, props.mixingHeight?.uom, 'ft'));
+
+        const transportWindRaw = getValue(props.transportWindSpeed);
+        const transportWindMph = Math.round(convertNWSValue(transportWindRaw, props.transportWindSpeed?.uom, 'mph'));
+
+        const transportWindDir = getValue(props.transportWindDirection);
         const vi = mixingHeightFt * transportWindMph;
 
         let dispersionQuality: string;
@@ -148,14 +170,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-function parseDurationHours(duration: string): number {
-  // Parse ISO 8601 duration: PT1H, PT2H, P1D, etc.
-  const match = duration.match(/P(?:(\d+)D)?T?(?:(\d+)H)?/);
-  if (!match) return 1;
-  const days = parseInt(match[1] || '0');
-  const hours = parseInt(match[2] || '0');
-  return days * 24 + (hours || 1);
-}
+
 
 function degreesToCardinal(deg: number): string {
   const dirs = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
