@@ -172,6 +172,9 @@ export interface HMSData {
   fires: HMSFirePoint[];
   smoke: GeoJSON.FeatureCollection | null;
   date: string;
+  region?: string;
+  /** Total detections in the region before the render cap was applied */
+  totalFires?: number;
 }
 
 // --- MFC Permits ---

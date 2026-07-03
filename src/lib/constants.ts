@@ -121,6 +121,59 @@ export const DROUGHT_COLORS: Record<number, { label: string; color: string }> = 
   4: { label: 'D4 - Exceptional Drought', color: '#730000' },
 };
 
+// HMS viewing regions — bounding boxes for server-side filtering plus
+// map center/zoom for the client. The HMS feed is hemisphere-wide
+// (~80k detections on a summer day); filtering keeps the map renderable.
+export interface HMSRegion {
+  label: string;
+  minLat: number;
+  maxLat: number;
+  minLon: number;
+  maxLon: number;
+  center: [number, number];
+  zoom: number;
+}
+
+export const HMS_REGIONS: Record<string, HMSRegion> = {
+  southeast: {
+    label: 'Gulf South / Southeast',
+    minLat: 23, maxLat: 40, minLon: -100, maxLon: -75,
+    center: [33, -88], zoom: 5,
+  },
+  northeast: {
+    label: 'Northeast / Mid-Atlantic',
+    minLat: 36, maxLat: 48, minLon: -83, maxLon: -66,
+    center: [42, -74], zoom: 5,
+  },
+  midwest: {
+    label: 'Midwest / Plains',
+    minLat: 36, maxLat: 50, minLon: -105, maxLon: -80,
+    center: [43, -93], zoom: 5,
+  },
+  southwest: {
+    label: 'Rockies / Southwest',
+    minLat: 28, maxLat: 49, minLon: -117, maxLon: -100,
+    center: [38, -108], zoom: 5,
+  },
+  westcoast: {
+    label: 'West Coast',
+    minLat: 32, maxLat: 49, minLon: -125, maxLon: -113,
+    center: [41, -120], zoom: 5,
+  },
+  alaska: {
+    label: 'Alaska',
+    minLat: 51, maxLat: 72, minLon: -170, maxLon: -129,
+    center: [63, -150], zoom: 4,
+  },
+  conus: {
+    label: 'Continental U.S.',
+    minLat: 24, maxLat: 50, minLon: -125, maxLon: -66,
+    center: [39, -96], zoom: 4,
+  },
+};
+
+export const DEFAULT_HMS_REGION = 'southeast';
+
 // HMS smoke density colors
 export const SMOKE_COLORS: Record<string, string> = {
   'Light': '#D3D3D3',

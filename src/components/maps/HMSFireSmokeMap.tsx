@@ -1,6 +1,7 @@
 'use client';
 
-import { MapContainer, TileLayer, CircleMarker, Popup, GeoJSON, LayersControl } from 'react-leaflet';
+import { useEffect } from 'react';
+import { MapContainer, TileLayer, CircleMarker, Popup, GeoJSON, LayersControl, useMap } from 'react-leaflet';
 import type { HMSData } from '@/lib/types';
 import { SMOKE_COLORS } from '@/lib/constants';
 import 'leaflet/dist/leaflet.css';
@@ -9,10 +10,22 @@ const { BaseLayer, Overlay } = LayersControl;
 
 interface Props {
   data: HMSData;
+  center?: [number, number];
+  zoom?: number;
 }
 
-export default function HMSFireSmokeMap({ data }: Props) {
-  const center: [number, number] = [35, -90]; // Center on Southeast US
+/** Fly to the new region when the selector changes (MapContainer only
+ *  honors center/zoom on first mount). */
+function RegionView({ center, zoom }: { center: [number, number]; zoom: number }) {
+  const map = useMap();
+  useEffect(() => {
+    map.setView(center, zoom);
+  }, [map, center[0], center[1], zoom]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return null;
+}
+
+export default function HMSFireSmokeMap({ data, center = [33, -88], zoom = 5 }: Props) {
 
   const smokeStyle = (feature: GeoJSON.Feature | undefined) => {
     const density = feature?.properties?.densityLabel || 'Unknown';
@@ -28,12 +41,13 @@ export default function HMSFireSmokeMap({ data }: Props) {
   return (
     <MapContainer
       center={center}
-      zoom={5}
+      zoom={zoom}
       // Canvas renderer draws the thousands of fire detections as pixels
       // instead of one SVG DOM node each — keeps pan/zoom smooth
       preferCanvas
       style={{ height: '600px', width: '100%', borderRadius: '0.5rem' }}
     >
+      <RegionView center={center} zoom={zoom} />
       <LayersControl position="topright">
         <BaseLayer checked name="Street Map">
           <TileLayer

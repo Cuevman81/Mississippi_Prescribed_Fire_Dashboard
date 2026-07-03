@@ -3,13 +3,17 @@ import shp from 'shpjs';
 import { rateLimit } from '@/lib/rate-limit';
 
 // HMS covers the whole hemisphere (~80k fire points on a summer day),
-// which froze the browser when rendered. Trim to the Gulf South /
-// Southeast region this dashboard serves. Smoke polygons are kept when
-// they REACH into the region even if the source fire is far away
+// which froze the browser when rendered. The client picks a viewing
+// region; we filter server-side. Smoke polygons are kept when they
+// REACH into the region even if the source fire is far away
 // (e.g., Canadian wildfire smoke drifting over Mississippi).
-const REGION = { minLat: 23, maxLat: 40, minLon: -100, maxLon: -75 };
+import { HMS_REGIONS, DEFAULT_HMS_REGION, type HMSRegion } from '@/lib/constants';
 
-function featureOverlapsRegion(geometry: GeoJSON.Geometry): boolean {
+// Cap what we return so even fire-season CONUS stays renderable;
+// highest-intensity detections (FRP) win the cut
+const MAX_FIRE_POINTS = 15000;
+
+function featureOverlapsRegion(geometry: GeoJSON.Geometry, region: HMSRegion): boolean {
   const polygons: GeoJSON.Position[][][] =
     geometry.type === 'Polygon'
       ? [(geometry as GeoJSON.Polygon).coordinates]
@@ -30,16 +34,25 @@ function featureOverlapsRegion(geometry: GeoJSON.Geometry): boolean {
   }
 
   return (
-    minLat <= REGION.maxLat &&
-    maxLat >= REGION.minLat &&
-    minLon <= REGION.maxLon &&
-    maxLon >= REGION.minLon
+    minLat <= region.maxLat &&
+    maxLat >= region.minLat &&
+    minLon <= region.maxLon &&
+    maxLon >= region.minLon
   );
 }
 
 export async function GET(request: NextRequest) {
   const limited = rateLimit(request, 20); // allows browsing back through dates
   if (limited) return limited;
+
+  const regionParam = request.nextUrl.searchParams.get('region') || DEFAULT_HMS_REGION;
+  const region = HMS_REGIONS[regionParam];
+  if (!region) {
+    return NextResponse.json(
+      { error: `Invalid region. Use one of: ${Object.keys(HMS_REGIONS).join(', ')}` },
+      { status: 400 }
+    );
+  }
 
   const dateParam = request.nextUrl.searchParams.get('date');
   if (dateParam && !/^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
@@ -66,7 +79,8 @@ export async function GET(request: NextRequest) {
 
     // Process fire points — regional filter cuts ~80k hemisphere-wide
     // points down to a renderable few thousand
-    let firePoints: Array<Record<string, unknown>> = [];
+    let firePoints: Array<{ lat: number; lon: number; frp: number } & Record<string, unknown>> = [];
+    let totalFires = 0;
     if (fires.status === 'fulfilled' && fires.value) {
       const fc = fires.value as GeoJSON.FeatureCollection;
       firePoints = (fc.features || [])
@@ -75,18 +89,26 @@ export async function GET(request: NextRequest) {
           lon: (f.properties?.Lon || (f.geometry as GeoJSON.Point)?.coordinates?.[0]) as number,
           satellite: f.properties?.Satellite || f.properties?.satellite || '',
           method: f.properties?.Method || f.properties?.method || '',
-          frp: f.properties?.FRP || f.properties?.frp || 0,
+          frp: Number(f.properties?.FRP || f.properties?.frp || 0),
           time: f.properties?.Time || f.properties?.time || '',
         }))
         .filter(
           (p) =>
             typeof p.lat === 'number' &&
             typeof p.lon === 'number' &&
-            p.lat >= REGION.minLat &&
-            p.lat <= REGION.maxLat &&
-            p.lon >= REGION.minLon &&
-            p.lon <= REGION.maxLon
+            p.lat >= region.minLat &&
+            p.lat <= region.maxLat &&
+            p.lon >= region.minLon &&
+            p.lon <= region.maxLon
         );
+
+      totalFires = firePoints.length;
+      if (firePoints.length > MAX_FIRE_POINTS) {
+        // Keep the most intense detections when a big region is in
+        // heavy fire season
+        firePoints.sort((a, b) => b.frp - a.frp);
+        firePoints = firePoints.slice(0, MAX_FIRE_POINTS);
+      }
     }
 
     // Process smoke polygons — add density classification, keep polygons
@@ -97,7 +119,7 @@ export async function GET(request: NextRequest) {
       smokeGeoJSON = {
         type: 'FeatureCollection',
         features: (fc.features || [])
-          .filter((f) => f.geometry && featureOverlapsRegion(f.geometry))
+          .filter((f) => f.geometry && featureOverlapsRegion(f.geometry, region))
           .map((f) => {
           const density = f.properties?.Density ?? f.properties?.density ?? 0;
           let densityLabel: string;
@@ -121,6 +143,8 @@ export async function GET(request: NextRequest) {
       fires: firePoints,
       smoke: smokeGeoJSON,
       date: `${year}-${month}-${day}`,
+      region: regionParam,
+      totalFires,
     }, {
       headers: {
         'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=300'
