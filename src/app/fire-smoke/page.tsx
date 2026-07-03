@@ -52,13 +52,16 @@ export default function FireSmokePage() {
           </div>
         </CardHeader>
         <CardContent>
-          {loading ? (
-            <div className="flex items-center justify-center h-96">
-              <Loader2 className="h-8 w-8 animate-spin text-orange-600" />
-            </div>
-          ) : hmsData ? (
-            <>
+          {hmsData ? (
+            // Keep the map mounted while a new date loads — remounting
+            // Leaflet on every change is expensive; overlay a spinner instead
+            <div className="relative">
               <HMSMap data={hmsData} />
+              {loading && (
+                <div className="absolute inset-0 z-[1000] flex items-center justify-center bg-white/60 rounded-lg">
+                  <Loader2 className="h-8 w-8 animate-spin text-orange-600" />
+                </div>
+              )}
               <div className="flex items-center gap-6 mt-3 text-xs text-slate-500">
                 <span>
                   <span className="inline-block w-3 h-3 rounded-full bg-red-600 mr-1" />
@@ -68,8 +71,15 @@ export default function FireSmokePage() {
                   <span className="inline-block w-3 h-3 rounded bg-gray-400 mr-1" />
                   Smoke polygons: {hmsData.smoke?.features?.length || 0}
                 </span>
+                <span className="text-slate-400">
+                  Showing Gulf South / Southeast region
+                </span>
               </div>
-            </>
+            </div>
+          ) : loading ? (
+            <div className="flex items-center justify-center h-96">
+              <Loader2 className="h-8 w-8 animate-spin text-orange-600" />
+            </div>
           ) : (
             <div className="flex items-center justify-center h-96 text-slate-400">
               <p>No HMS data available for this date.</p>

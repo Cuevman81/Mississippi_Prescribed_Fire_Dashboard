@@ -29,6 +29,9 @@ export default function HMSFireSmokeMap({ data }: Props) {
     <MapContainer
       center={center}
       zoom={5}
+      // Canvas renderer draws the thousands of fire detections as pixels
+      // instead of one SVG DOM node each — keeps pan/zoom smooth
+      preferCanvas
       style={{ height: '600px', width: '100%', borderRadius: '0.5rem' }}
     >
       <LayersControl position="topright">
