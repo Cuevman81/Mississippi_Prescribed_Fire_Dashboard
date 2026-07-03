@@ -251,14 +251,19 @@ export default function BurnWindowsPage() {
                     return (
                       <div
                         key={`${day}-${h}`}
-                        className="aspect-square rounded-sm cursor-pointer transition-transform hover:scale-110 hover:z-10 relative"
+                        className="aspect-square rounded-sm cursor-pointer transition-transform hover:scale-110 hover:z-10 relative flex items-center justify-center text-[9px] font-bold select-none"
                         style={{
                           backgroundColor: cell ? getBurnQualityColor(cell.score) : '#f1f5f9',
+                          color: cell && cell.score >= 50 && cell.score < 70 ? '#000000' : '#ffffff',
                           minHeight: '20px',
                         }}
                         onMouseEnter={() => cell && setHoveredCell({ day, hour: h, score: cell.score, quality: cell.quality, reasons: cell.reasons })}
                         onMouseLeave={() => setHoveredCell(null)}
-                      />
+                        title={cell ? `${cell.quality} (${cell.score})` : 'No data'}
+                        aria-label={cell ? `${day} hour ${h}: ${cell.quality} quality, score ${cell.score}` : `${day} hour ${h}: no data`}
+                      >
+                        {cell ? cell.quality[0] : ''}
+                      </div>
                     );
                   })}
                 </React.Fragment>

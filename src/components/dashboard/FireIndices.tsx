@@ -37,11 +37,11 @@ export function FireIndices() {
       show: current.precipChance > 0,
     },
     {
-      label: 'KBDI Trend',
+      label: 'Est. KBDI Trend',
       value: `${current.kbdiTrend}`,
     },
     {
-      label: 'FFMC',
+      label: 'FFMC (Fine Fuel)',
       value: `${current.ffmc}`,
       warn: current.ffmc >= FFMC_THRESHOLDS.EXTREME
         ? 'EXTREME ignition potential'

@@ -94,7 +94,7 @@ export function getDispersionColor(category: string): string {
 // AQI category colors (EPA standard)
 export const AQI_COLORS: Record<string, string> = {
   'Good': '#00e400',
-  'Moderate': '#ffff00',
+  'Moderate': '#eab308',
   'Unhealthy for Sensitive Groups': '#ff7e00',
   'USG': '#ff7e00',
   'Unhealthy': '#ff0000',
