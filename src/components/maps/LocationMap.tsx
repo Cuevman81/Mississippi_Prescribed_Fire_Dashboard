@@ -1,9 +1,10 @@
 'use client';
 
-import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
+import { MapContainer, Marker, Popup, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useDashboard } from '@/lib/dashboard-context';
+import { LightGrayBasemap } from './Basemap';
 import { MapPin, Radio } from 'lucide-react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
@@ -51,10 +52,7 @@ export default function LocationMap() {
         zoom={10}
         style={{ height: '100%', width: '100%' }}
       >
-        <TileLayer
-          url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-          attribution='&copy; OpenStreetMap'
-        />
+        <LightGrayBasemap />
         
         <MapEvents />
 

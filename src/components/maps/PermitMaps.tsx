@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useEffect, useRef } from 'react';
-import { MapContainer, TileLayer, CircleMarker, Popup, Marker, useMap } from 'react-leaflet';
+import { MapContainer, CircleMarker, Popup, Marker, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import type { MFCPermit } from '@/lib/types';
+import { LightGrayBasemap } from './Basemap';
 import { PERMIT_DISPERSION_COLORS } from '@/lib/constants';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet.heat';
@@ -26,10 +27,7 @@ export default function PermitMaps({ permits, type }: Props) {
       zoom={7}
       style={{ height: '400px', width: '100%', borderRadius: '0.5rem' }}
     >
-      <TileLayer
-        url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-        attribution='&copy; OpenStreetMap'
-      />
+      <LightGrayBasemap />
 
       {/* Heatmap layer for density type */}
       {type === 'density' && validPermits.length > 0 && (

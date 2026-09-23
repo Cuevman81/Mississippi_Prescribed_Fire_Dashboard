@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { MapContainer, TileLayer, CircleMarker, Popup, GeoJSON, LayersControl, useMap } from 'react-leaflet';
 import type { HMSData } from '@/lib/types';
 import { SMOKE_COLORS } from '@/lib/constants';
+import { LightGrayBasemap } from './Basemap';
 import 'leaflet/dist/leaflet.css';
 
 const { BaseLayer, Overlay } = LayersControl;
@@ -50,10 +51,7 @@ export default function HMSFireSmokeMap({ data, center = [33, -88], zoom = 5 }: 
       <RegionView center={center} zoom={zoom} />
       <LayersControl position="topright">
         <BaseLayer checked name="Street Map">
-          <TileLayer
-            url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-            attribution='&copy; OpenStreetMap'
-          />
+          <LightGrayBasemap />
         </BaseLayer>
         <BaseLayer name="Satellite">
           <TileLayer

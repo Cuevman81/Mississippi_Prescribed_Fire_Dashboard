@@ -1,7 +1,8 @@
 'use client';
 
-import { MapContainer, TileLayer, GeoJSON } from 'react-leaflet';
+import { MapContainer, GeoJSON } from 'react-leaflet';
 import { DROUGHT_COLORS } from '@/lib/constants';
+import { LightGrayBasemap } from './Basemap';
 import 'leaflet/dist/leaflet.css';
 
 interface Props {
@@ -28,10 +29,7 @@ export default function DroughtMap({ data }: Props) {
       zoom={4}
       style={{ height: '500px', width: '100%', borderRadius: '0.5rem' }}
     >
-      <TileLayer
-        url="https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png"
-        attribution='&copy; OpenStreetMap'
-      />
+      <LightGrayBasemap labels={false} />
       <GeoJSON
         data={data}
         style={droughtStyle}
