@@ -170,11 +170,19 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const [aqiForecast, setAqiForecast] = useState<AQIForecast[]>([]);
   const [aqiMonitors, setAqiMonitors] = useState<AQIMonitor[]>([]);
   const [lastUpdated, setLastUpdated] = useState<string>('');
+  // Wall-clock time used to pick the "now" forecast hour. Ticks while the page
+  // stays open so the status card doesn't freeze on the hour it was loaded.
+  const [nowTick, setNowTick] = useState(() => Date.now());
 
   // Persist prescription anytime it changes
   React.useEffect(() => {
     localStorage.setItem('prfi_prescription', JSON.stringify(prescription));
   }, [prescription]);
+
+  React.useEffect(() => {
+    const id = setInterval(() => setNowTick(Date.now()), 5 * 60 * 1000);
+    return () => clearInterval(id);
+  }, []);
 
   // Auto-refresh alerts every 5 minutes
   React.useEffect(() => {
@@ -192,7 +200,6 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
           setFireDiscussion(alertData.fireDiscussion || '');
           setZoneForecast(alertData.zoneForecast || '');
           setBurnBanInfo(alertData.burnBanInfo || '');
-          setLastUpdated(new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }));
         } else {
           // Keep the last known alerts on screen, but flag that they're unconfirmed
           setAlertsAvailable(false);
@@ -239,7 +246,22 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       }
 
       setLocation(loc);
+      // Clear everything that belongs to the previous place, so a failed
+      // load can't leave its forecast, alerts or AQI under the new name
+      setWeatherGridData(null);
+      setNarrativeForecast([]);
+      setNwsOffice('');
+      setAlerts([]);
       setAlertsAvailable(false);
+      setFireDiscussion('');
+      setZoneForecast('');
+      setBurnBanInfo('');
+      setCurrentAQI([]);
+      setAqiForecast([]);
+      setStationObservation(null);
+      setKbdi(null);
+      setLastUpdated('');
+      setNowTick(Date.now());
 
       // Step 2: Fetch weather + alerts + air quality + drought in parallel
       const [weatherRes, aqCurrentRes, aqForecastRes, aqMonitorsRes, kbdiRes] = await Promise.all([
@@ -292,6 +314,12 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
           setZoneForecast(alertData.zoneForecast || '');
           setBurnBanInfo(alertData.burnBanInfo || '');
         }
+      } else {
+        setError(
+          weatherRes.status === 429
+            ? 'Too many requests in a short time. Please wait a minute and try again.'
+            : 'The NWS forecast is unavailable for this location right now. Please try again shortly.'
+        );
       }
 
       if (aqCurrentRes.ok) setCurrentAQI(await aqCurrentRes.json());
@@ -341,7 +369,9 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         }
       } catch { }
 
-      setLastUpdated(new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }));
+      if (weatherRes.ok) {
+        setLastUpdated(new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }));
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
@@ -534,7 +564,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   // Find the forecast hour closest to the current time
   const currentForecastIdx = React.useMemo(() => {
     if (!forecast.length) return 0;
-    const now = Date.now();
+    const now = nowTick;
     let bestIdx = 0;
     let bestDiff = Infinity;
     for (let i = 0; i < forecast.length; i++) {
@@ -545,7 +575,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       }
     }
     return bestIdx;
-  }, [forecast]);
+  }, [forecast, nowTick]);
 
   return (
     <DashboardContext.Provider
