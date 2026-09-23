@@ -114,6 +114,8 @@ export interface AQIObservation {
   dateObserved: string;
   hourObserved: number;
   localTimeZone: string;
+  /** Start of the observation hour in UTC (ISO), when the time zone is known */
+  observedAt?: string | null;
   reportingArea: string;
   stateCode: string;
   latitude: number;

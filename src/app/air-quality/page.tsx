@@ -11,7 +11,7 @@ import { useMemo } from 'react';
 const MonitorMap = dynamic(() => import('@/components/maps/MonitorMap'), { ssr: false });
 
 export default function AirQualityPage() {
-  const { currentAQI, aqiForecast, aqiMonitors, isLoading, location, timezone } = useDashboard();
+  const { currentAQI, aqiForecast, aqiMonitors, isLoading, aqiLoading, location, timezone } = useDashboard();
 
   // Separate forecasts by date. AirNow forecast dates are the reporting
   // area's local date; toISOString() is UTC, which is already "tomorrow"
@@ -89,12 +89,25 @@ export default function AirQualityPage() {
                 }
                 return `${dateLabel} at ${h12}:00 ${ampm} ${obs.localTimeZone || 'Local'}`;
               })()}
+              {(() => {
+                // The route may serve its last good AirNow answer while AirNow
+                // is slow or down; say how old it is once that's unusual
+                const at = currentAQI[0].observedAt ? new Date(currentAQI[0].observedAt).getTime() : NaN;
+                const ageHours = (new Date().getTime() - at) / 3600000;
+                return Number.isFinite(ageHours) && ageHours >= 3 ? (
+                  <span className="text-amber-700 font-medium">
+                    {` — about ${Math.floor(ageHours)} hours old; AirNow may be delayed`}
+                  </span>
+                ) : null;
+              })()}
             </p>
           )}
         </CardHeader>
         <CardContent>
           {currentAQI.length === 0 ? (
-            <p className="text-sm text-slate-400">No current AQI observations available.</p>
+            <p className="text-sm text-slate-400">
+              {aqiLoading ? 'Loading current air quality from AirNow…' : 'No current AQI observations available.'}
+            </p>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               {currentAQI.map((obs, i) => (
@@ -129,7 +142,7 @@ export default function AirQualityPage() {
           </CardHeader>
           <CardContent>
             {todayForecast.length === 0 ? (
-              <p className="text-sm text-slate-400">No forecast available.</p>
+              <p className="text-sm text-slate-400">{aqiLoading ? 'Loading forecast…' : 'No forecast available.'}</p>
             ) : (
               <div className="space-y-2">
                 {todayForecast.map((f, i) => (
@@ -158,7 +171,7 @@ export default function AirQualityPage() {
           </CardHeader>
           <CardContent>
             {tomorrowForecast.length === 0 ? (
-              <p className="text-sm text-slate-400">No forecast available.</p>
+              <p className="text-sm text-slate-400">{aqiLoading ? 'Loading forecast…' : 'No forecast available.'}</p>
             ) : (
               <div className="space-y-2">
                 {tomorrowForecast.map((f, i) => (

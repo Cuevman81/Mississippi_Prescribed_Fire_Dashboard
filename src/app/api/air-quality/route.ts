@@ -4,6 +4,20 @@ import { rateLimit } from '@/lib/rate-limit';
 const API_KEY = process.env.AIRNOW_API_KEY;
 const MS_BBOX = '-91.655,30.174,-88.098,34.996';
 const UPSTREAM_TIMEOUT_MS = 10_000;
+// AirNow's current-observation service took ~21 s to answer on the night of
+// 2026-09-22, so the lat/long calls get more time than the other upstreams
+const AIRNOW_LATLON_TIMEOUT_MS = 30_000;
+// Cache per rounded location in Next's data cache (shared across instances
+// on Vercel): only the first visitor for a spot waits on AirNow. When an
+// entry goes stale it is still served while Next refetches in the
+// background, and a failed refetch is not cached, so a slow or down AirNow
+// keeps serving the last good answer. Its observation time is passed through.
+const CURRENT_REVALIDATE_S = 600; // NowCast updates hourly
+const FORECAST_REVALIDATE_S = 1800; // forecasts are issued once or twice a day
+
+// Covers the 30 s AirNow timeout plus the rest of the request on every
+// Vercel plan (Hobby allows up to 60 s even without Fluid compute)
+export const maxDuration = 60;
 
 export async function GET(request: NextRequest) {
   const limited = rateLimit(request, 40); // dashboard fires 3 AQ calls per search
@@ -60,10 +74,12 @@ export async function GET(request: NextRequest) {
 //   forecasts: DateForecast -> dateValid, Category -> categoryNumber +
 //     categoryName; Latitude/Longitude are gone
 function airNowUrl(path: string, lat: number, lon: number): string {
+  // Rounded to 0.01° (under 1 km; AirNow searches a 25-mile radius) so that
+  // nearby searches share one cache entry
   const params = new URLSearchParams({
     format: 'application/json',
-    latitude: lat.toFixed(4),
-    longitude: lon.toFixed(4),
+    latitude: lat.toFixed(2),
+    longitude: lon.toFixed(2),
     distance: '25',
     API_KEY: API_KEY!,
   });
@@ -72,7 +88,8 @@ function airNowUrl(path: string, lat: number, lon: number): string {
 
 async function getCurrentAQI(lat: number, lon: number) {
   const res = await fetch(airNowUrl('/aq/observation/current/ziplatlong/', lat, lon), {
-    signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+    signal: AbortSignal.timeout(AIRNOW_LATLON_TIMEOUT_MS),
+    next: { revalidate: CURRENT_REVALIDATE_S },
   });
 
   if (!res.ok) {
@@ -87,6 +104,11 @@ async function getCurrentAQI(lat: number, lon: number) {
       dateObserved: String(pick(obs, 'dateObserved', 'DateObserved') ?? '').trim(),
       hourObserved: toHour(pick(obs, 'hourObserved', 'HourObserved')),
       localTimeZone: pick(obs, 'localTimeZone', 'LocalTimeZone'),
+      observedAt: toObservedAt(
+        String(pick(obs, 'dateObserved', 'DateObserved') ?? '').trim(),
+        toHour(pick(obs, 'hourObserved', 'HourObserved')),
+        pick(obs, 'localTimeZone', 'LocalTimeZone')
+      ),
       reportingArea: pick(obs, 'reportingAreaName', 'ReportingArea', 'reportingArea'),
       stateCode: pick(obs, 'StateCode', 'stateCode'),
       latitude: pick(obs, 'Latitude', 'latitude'),
@@ -104,7 +126,8 @@ async function getCurrentAQI(lat: number, lon: number) {
 
 async function getForecastAQI(lat: number, lon: number) {
   const res = await fetch(airNowUrl('/aq/forecast/current/', lat, lon), {
-    signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+    signal: AbortSignal.timeout(AIRNOW_LATLON_TIMEOUT_MS),
+    next: { revalidate: FORECAST_REVALIDATE_S },
   });
 
   if (!res.ok) {
@@ -208,6 +231,20 @@ function toAQI(v: unknown): number | null {
 function toHour(v: unknown): number | null {
   const n = typeof v === 'number' ? v : parseInt(String(v ?? ''), 10);
   return Number.isFinite(n) && n >= 0 && n <= 23 ? n : null;
+}
+
+// UTC offsets for the US time-zone labels AirNow reports (localTimeZone)
+const TZ_OFFSET_HOURS: Record<string, number> = {
+  EST: -5, EDT: -4, CST: -6, CDT: -5, MST: -7, MDT: -6, PST: -8, PDT: -7,
+  AKST: -9, AKDT: -8, HST: -10, AST: -4, ADT: -3,
+};
+
+/** Start of the observation hour as a UTC ISO time, or null if it can't be placed. */
+function toObservedAt(date: string, hour: number | null, tz: unknown): string | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+  const offset = typeof tz === 'string' ? TZ_OFFSET_HOURS[tz.trim().toUpperCase()] : undefined;
+  if (!m || hour === null || offset === undefined) return null;
+  return new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), hour - offset)).toISOString();
 }
 
 // AirNow's category numbers for the six EPA AQI categories (the same numbers

@@ -22,10 +22,13 @@ let ip = 1;
 const req = (query: string) =>
   new NextRequest(`http://localhost/api/air-quality?${query}`, { headers: { 'x-forwarded-for': `10.0.0.${ip++}` } });
 
+const inits: RequestInit[] = [];
 function upstream(body: unknown) {
   const urls: string[] = [];
-  vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+  inits.length = 0;
+  vi.stubGlobal('fetch', vi.fn(async (url: string, init: RequestInit) => {
     urls.push(String(url));
+    inits.push(init);
     return new Response(JSON.stringify(body), { status: 200 });
   }));
   return urls;
@@ -69,8 +72,27 @@ describe('current AQI (AirNow 2026-09-30 migration)', () => {
     const urls = upstream(NEW_OBS);
     await GET(req(`type=current&lat=${encodeURIComponent('32.3&distance=500')}&lon=-90.2`));
     const u = new URL(urls[0]);
-    expect(u.searchParams.get('latitude')).toBe('32.3000');
+    expect(u.searchParams.get('latitude')).toBe('32.30');
     expect(u.searchParams.get('distance')).toBe('25');
+  });
+
+  it('caches per rounded location and allows a slow AirNow 30 s', async () => {
+    const urls = upstream(NEW_OBS);
+    await GET(req('type=current&lat=32.2988&lon=-90.1848'));
+    await GET(req('type=current&lat=32.3012&lon=-90.1802'));
+    expect(urls[0]).toBe(urls[1]); // same 0.01° cell, same cache key
+    expect((inits[0] as { next?: { revalidate?: number } }).next?.revalidate).toBe(600);
+    expect(inits[0].signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it('gives each reading its UTC observation time', async () => {
+    upstream(NEW_OBS);
+    const data = await (await GET(req('type=current&lat=32.2988&lon=-90.1848'))).json();
+    // 21:00 CDT on Sep 22 is 02:00 UTC on Sep 23
+    expect(data[0].observedAt).toBe('2026-09-23T02:00:00.000Z');
+    upstream([{ ...NEW_OBS[0], localTimeZone: 'XYZ' }]);
+    const unknown = await (await GET(req('type=current&lat=32.2988&lon=-90.1848'))).json();
+    expect(unknown[0].observedAt).toBeNull();
   });
 });
 

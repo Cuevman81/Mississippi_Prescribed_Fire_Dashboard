@@ -108,10 +108,11 @@ interface DashboardState {
   // Station
   stationObservation: StationObservation | null;
 
-  // Air quality
+  // Air quality (loads separately from the forecast; AirNow can be slow)
   currentAQI: AQIObservation[];
   aqiForecast: AQIForecast[];
   aqiMonitors: AQIMonitor[];
+  aqiLoading: boolean;
 
   // Drought (real KBDI computed from observed climate data)
   kbdi: KBDIData | null;
@@ -169,6 +170,10 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const [currentAQI, setCurrentAQI] = useState<AQIObservation[]>([]);
   const [aqiForecast, setAqiForecast] = useState<AQIForecast[]>([]);
   const [aqiMonitors, setAqiMonitors] = useState<AQIMonitor[]>([]);
+  const [aqiLoading, setAqiLoading] = useState(false);
+  // Bumped on every search, so a late AirNow answer for an earlier place
+  // can't overwrite the current one
+  const aqRequestRef = React.useRef(0);
   const [lastUpdated, setLastUpdated] = useState<string>('');
   // Wall-clock time used to pick the "now" forecast hour. Ticks while the page
   // stays open so the status card doesn't freeze on the hour it was loaded.
@@ -263,12 +268,25 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       setLastUpdated('');
       setNowTick(Date.now());
 
-      // Step 2: Fetch weather + alerts + air quality + drought in parallel
-      const [weatherRes, aqCurrentRes, aqForecastRes, aqMonitorsRes, kbdiRes] = await Promise.all([
+      // Air quality loads on its own: AirNow has taken 20+ s to answer, and
+      // the forecast and burn status shouldn't wait for it
+      const aqRequest = ++aqRequestRef.current;
+      const isCurrentRequest = () => aqRequest === aqRequestRef.current;
+      const loadAQ = <T,>(url: string, set: (data: T) => void) =>
+        fetch(url)
+          .then((r) => (r.ok ? r.json() : null))
+          .then((data) => { if (data && isCurrentRequest()) set(data as T); })
+          .catch(() => {});
+      setAqiLoading(true);
+      void Promise.all([
+        loadAQ<AQIObservation[]>(`/api/air-quality?type=current&lat=${loc.lat}&lon=${loc.lon}`, setCurrentAQI),
+        loadAQ<AQIForecast[]>(`/api/air-quality?type=forecast&lat=${loc.lat}&lon=${loc.lon}`, setAqiForecast),
+        loadAQ<AQIMonitor[]>(`/api/air-quality?type=monitors`, setAqiMonitors),
+      ]).then(() => { if (isCurrentRequest()) setAqiLoading(false); });
+
+      // Step 2: Fetch weather + drought in parallel (alerts follow the weather)
+      const [weatherRes, kbdiRes] = await Promise.all([
         fetch(`/api/weather?lat=${loc.lat}&lon=${loc.lon}`),
-        fetch(`/api/air-quality?type=current&lat=${loc.lat}&lon=${loc.lon}`),
-        fetch(`/api/air-quality?type=forecast&lat=${loc.lat}&lon=${loc.lon}`),
-        fetch(`/api/air-quality?type=monitors`),
         fetch(`/api/kbdi?lat=${loc.lat}&lon=${loc.lon}`),
       ]);
 
@@ -322,9 +340,6 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         );
       }
 
-      if (aqCurrentRes.ok) setCurrentAQI(await aqCurrentRes.json());
-      if (aqForecastRes.ok) setAqiForecast(await aqForecastRes.json());
-      if (aqMonitorsRes.ok) setAqiMonitors(await aqMonitorsRes.json());
       if (kbdiRes.ok) {
         const kbdiData = await kbdiRes.json();
         setKbdi(kbdiData.kbdi != null ? kbdiData : null);
@@ -601,6 +616,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         currentAQI,
         aqiForecast,
         aqiMonitors,
+        aqiLoading,
         kbdi,
         fetchForecast,
         fetchForecastByCoords,
