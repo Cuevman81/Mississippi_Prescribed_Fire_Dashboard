@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { rateLimit } from '@/lib/rate-limit';
+import { CRITICAL_FIRE_ALERTS, SMOKE_RELEVANT_ALERTS } from '@/lib/constants';
 
 const NWS_HEADERS = {
   'User-Agent': process.env.NWS_USER_AGENT || 'PrescribedBurnApp/3.0',
   'Accept': 'application/geo+json',
 };
+const UPSTREAM_TIMEOUT_MS = 10_000;
+
+// Veto and smoke-management events are always passed through, whatever the
+// keyword filter below would say about their names
+const ALWAYS_SHOW = new Set<string>([...CRITICAL_FIRE_ALERTS, ...SMOKE_RELEVANT_ALERTS]);
 
 export async function GET(request: NextRequest) {
   const limited = rateLimit(request, 30);
@@ -31,10 +37,13 @@ export async function GET(request: NextRequest) {
   try {
     // Get forecast zone for alert checking
     const pointRes = await fetch(
-      `https://api.weather.gov/points/${lat},${lon}`,
-      { headers: NWS_HEADERS }
+      `https://api.weather.gov/points/${latNum.toFixed(4)},${lonNum.toFixed(4)}`,
+      { headers: NWS_HEADERS, signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS) }
     );
 
+    // True only when NWS actually answered the active-alerts query. The client
+    // must not read an empty list as "no alerts" when the check failed.
+    let alertsAvailable = false;
     let alerts: unknown[] = [];
     let fireDiscussion = '';
     let zoneForecast = '';
@@ -50,14 +59,16 @@ export async function GET(request: NextRequest) {
         // Fetch active alerts for this zone
         const alertsRes = await fetch(
           `https://api.weather.gov/alerts/active/zone/${zoneId}`,
-          { headers: NWS_HEADERS }
+          { headers: NWS_HEADERS, signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS) }
         );
 
         if (alertsRes.ok) {
           const alertsData = await alertsRes.json();
           alerts = (alertsData.features || [])
-            .filter((f: { properties: { event: string } }) => {
-              const evt = f.properties.event.toLowerCase();
+            .filter((f: { properties: { event?: string } }) => {
+              const event = f.properties?.event ?? '';
+              if (ALWAYS_SHOW.has(event)) return true;
+              const evt = event.toLowerCase();
               return (
                 evt.includes('red flag') ||
                 evt.includes('fire weather') ||
@@ -74,6 +85,7 @@ export async function GET(request: NextRequest) {
               onset: f.properties.onset,
               expires: f.properties.expires,
             }));
+          alertsAvailable = true;
         }
       }
     }
@@ -83,7 +95,7 @@ export async function GET(request: NextRequest) {
       try {
         const fwfRes = await fetch(
           `https://api.weather.gov/products/types/FWF/locations/${nwsOffice}`,
-          { headers: NWS_HEADERS }
+          { headers: NWS_HEADERS, signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS) }
         );
 
         if (fwfRes.ok) {
@@ -91,7 +103,7 @@ export async function GET(request: NextRequest) {
           const latest = fwfList['@graph']?.[0];
 
           if (latest?.['@id']) {
-            const productRes = await fetch(latest['@id'], { headers: NWS_HEADERS });
+            const productRes = await fetch(latest['@id'], { headers: NWS_HEADERS, signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS) });
             if (productRes.ok) {
               const productData = await productRes.json();
               const fullText = productData.productText || '';
@@ -118,7 +130,7 @@ export async function GET(request: NextRequest) {
       try {
         const fwnRes = await fetch(
           `https://api.weather.gov/products/types/FWN/locations/${nwsOffice}`,
-          { headers: NWS_HEADERS }
+          { headers: NWS_HEADERS, signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS) }
         );
 
         if (fwnRes.ok) {
@@ -126,7 +138,7 @@ export async function GET(request: NextRequest) {
           const latest = fwnList['@graph']?.[0];
 
           if (latest?.['@id']) {
-            const productRes = await fetch(latest['@id'], { headers: NWS_HEADERS });
+            const productRes = await fetch(latest['@id'], { headers: NWS_HEADERS, signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS) });
             if (productRes.ok) {
               const productData = await productRes.json();
               const text = (productData.productText || '').toLowerCase();
@@ -143,12 +155,13 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       alerts,
+      alertsAvailable,
       fireDiscussion,
       zoneForecast,
       burnBanInfo,
     });
   } catch (err) {
     console.error('Alerts API error:', err);
-    return NextResponse.json({ error: 'Alerts service unavailable' }, { status: 500 });
+    return NextResponse.json({ error: 'Alerts service unavailable', alertsAvailable: false }, { status: 500 });
   }
 }

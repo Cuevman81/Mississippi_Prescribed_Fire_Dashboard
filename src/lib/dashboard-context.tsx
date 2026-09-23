@@ -100,6 +100,7 @@ interface DashboardState {
 
   // Alerts
   alerts: AlertInfo[];
+  alertsAvailable: boolean; // false until NWS alerts were actually checked
   fireDiscussion: string;
   zoneForecast: string;
   burnBanInfo: string;
@@ -158,6 +159,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const [timezone, setTimezone] = useState('America/Chicago');
 
   const [alerts, setAlerts] = useState<AlertInfo[]>([]);
+  const [alertsAvailable, setAlertsAvailable] = useState(false);
   const [fireDiscussion, setFireDiscussion] = useState('');
   const [zoneForecast, setZoneForecast] = useState('');
   const [burnBanInfo, setBurnBanInfo] = useState('');
@@ -186,13 +188,18 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         if (alertsWithOffice.ok) {
           const alertData = await alertsWithOffice.json();
           setAlerts(alertData.alerts || []);
+          setAlertsAvailable(alertData.alertsAvailable === true);
           setFireDiscussion(alertData.fireDiscussion || '');
           setZoneForecast(alertData.zoneForecast || '');
           setBurnBanInfo(alertData.burnBanInfo || '');
           setLastUpdated(new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }));
+        } else {
+          // Keep the last known alerts on screen, but flag that they're unconfirmed
+          setAlertsAvailable(false);
         }
       } catch (err) {
         console.error('Failed to auto-refresh alerts:', err);
+        setAlertsAvailable(false);
       }
     };
 
@@ -232,6 +239,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       }
 
       setLocation(loc);
+      setAlertsAvailable(false);
 
       // Step 2: Fetch weather + alerts + air quality + drought in parallel
       const [weatherRes, aqCurrentRes, aqForecastRes, aqMonitorsRes, kbdiRes] = await Promise.all([
@@ -279,6 +287,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         if (alertsWithOffice.ok) {
           const alertData = await alertsWithOffice.json();
           setAlerts(alertData.alerts || []);
+          setAlertsAvailable(alertData.alertsAvailable === true);
           setFireDiscussion(alertData.fireDiscussion || '');
           setZoneForecast(alertData.zoneForecast || '');
           setBurnBanInfo(alertData.burnBanInfo || '');
@@ -553,6 +562,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         timezone,
         lastUpdated,
         alerts,
+        alertsAvailable,
         fireDiscussion,
         zoneForecast,
         burnBanInfo,

@@ -223,13 +223,24 @@ export const FUEL_MOISTURE_1HR = {
 // Real KBDI severity threshold (0-800 scale) for the drought alert
 export const KBDI_SEVERE = 600;
 
-// Critical fire weather alert types that should veto any burn
+// Critical fire weather alert types that should veto any burn.
+// Names must match NWS event names exactly (api.weather.gov/alerts/types).
+// NWS renamed "Excessive Heat Warning" to "Extreme Heat Warning" in 2025;
+// the old name no longer appears in the event list.
 export const CRITICAL_FIRE_ALERTS = [
   'Red Flag Warning',
   'Fire Weather Watch',
   'Extreme Fire Danger',
   'Fire Warning',
-  'Excessive Heat Warning',
+  'Extreme Heat Warning',
+] as const;
+
+// Smoke-management advisories: always shown to the burner, but not a veto
+// on their own
+export const SMOKE_RELEVANT_ALERTS = [
+  'Dense Smoke Advisory',
+  'Air Stagnation Advisory',
+  'Dense Fog Advisory',
 ] as const;
 
 // Mississippi bounding box (for AirNow state monitor queries)

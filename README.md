@@ -8,7 +8,7 @@ A comprehensive web-based decision support tool for prescribed fire managers, pr
 
 ### 1. Real-Time Operational Dashboard
 *   **Burn Status Summary:** Instant "Within/Outside Prescription" status with specific reasons for sub-optimal conditions. 
-*   **Critical Fire Alerts:** High-priority "Veto" logic that automatically flags the burn as RESTRICTED during NWS Fire Weather Watches, Red Flag Warnings, and Excessive Heat Warnings. Alerts auto-refresh every 5 minutes so warnings issued mid-session appear without reloading.
+*   **Critical Fire Alerts:** High-priority "Veto" logic that automatically flags the burn as RESTRICTED during NWS Red Flag Warnings, Fire Weather Watches, Fire Warnings, Extreme Fire Danger, and Extreme Heat Warnings. Dense Smoke, Air Stagnation, and Dense Fog advisories are always shown. Alerts auto-refresh every 5 minutes so warnings issued mid-session appear without reloading, and if NWS alerts cannot be checked the status card says so instead of showing green.
 *   **Interactive Location Map:** Click-to-set location functionality to get pinpoint forecasts for any burn unit.
 *   **Current Conditions:** Real-time data from the nearest ASOS/AWOS weather stations integrated with NWS high-resolution grid forecasts.
 

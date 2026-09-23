@@ -7,7 +7,7 @@ import { CRITICAL_FIRE_ALERTS } from '@/lib/constants';
 import { motion } from 'framer-motion';
 
 export function BurnStatusSummary() {
-  const { forecast, currentForecastIdx, prescription, alerts } = useDashboard();
+  const { forecast, currentForecastIdx, prescription, alerts, alertsAvailable } = useDashboard();
   const nowForecast = forecast[currentForecastIdx] || forecast[0];
 
   if (!nowForecast) return null;
@@ -21,6 +21,11 @@ export function BurnStatusSummary() {
 
   if (criticalAlerts.length > 0) {
     reasons.push(`NWS ${criticalAlerts[0].event} ACTIVE`);
+  }
+
+  // Fail closed: if the alert check itself failed, never show green
+  if (!alertsAvailable) {
+    reasons.push('NWS alerts could not be checked — verify at weather.gov');
   }
 
   if (nowForecast.temp < prescription.tempMin) reasons.push(`Temp too low (${nowForecast.temp}°F < ${prescription.tempMin}°F)`);

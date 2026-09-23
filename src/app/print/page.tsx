@@ -6,7 +6,7 @@ import { Flame, MapPin, Wind, Thermometer, Droplets, ArrowUpDown, AlertTriangle 
 import { useEffect } from 'react';
 
 export default function PrintPlanPage() {
-  const { location, forecast, currentForecastIdx, prescription, stationObservation, alerts } = useDashboard();
+  const { location, forecast, currentForecastIdx, prescription, stationObservation, alerts, alertsAvailable } = useDashboard();
 
   useEffect(() => {
     // Optional: automatically trigger print dialog
@@ -45,6 +45,22 @@ export default function PrintPlanPage() {
         </div>
       </div>
       
+      {!alertsAvailable && (
+        <div className="mb-6 p-4 rounded-lg border-2 bg-amber-50 border-amber-500">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="h-6 w-6 text-amber-600 flex-shrink-0" />
+            <div>
+              <h2 className="font-bold text-lg uppercase tracking-tight text-amber-800">
+                NWS alerts could not be checked
+              </h2>
+              <p className="text-sm font-bold mt-0.5 text-amber-700">
+                The absence of alerts on this plan is not confirmed. Verify active alerts at weather.gov before ignition.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Critical Alerts Section */}
       {alerts.length > 0 && (
         <div className="mb-6 space-y-2">
