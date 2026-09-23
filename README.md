@@ -37,9 +37,11 @@ No installation or technical setup is required for end users. Simply open the li
 ## 🛠 Technical Stack (For Developers)
 
 *   **Framework:** [Next.js 16+](https://nextjs.org/) (React 19) with Turbopack
-*   **Mapping:** Leaflet & React-Leaflet
+*   **Mapping:** Leaflet & React-Leaflet on keyless Esri basemaps (Powered by Esri)
 *   **Visualization:** Recharts (Dynamic Fire Density & Smoke Scattering)
-*   **Data Sources:** NWS API, EPA AirNow, NOAA HMS, U.S. Drought Monitor, MFC.
+*   **Data Sources:** NWS API, EPA AirNow, NOAA HMS, U.S. Drought Monitor, MFC, Iowa Environmental Mesonet (station observations), RCC-ACIS (PRISM grids for KBDI), OpenStreetMap Nominatim (place search).
+
+To run it locally: `npm install`, put `AIRNOW_API_KEY` (and optionally `NWS_USER_AGENT`, the User-Agent sent to NWS and Nominatim) in `.env.local`, then `npm run dev`. `npm test` runs the unit tests.
 
 ### Fire Science Foundations
 
@@ -57,7 +59,7 @@ All fire-weather indices are computed from published, citable methods:
 *   **Unit-aware NWS conversions:** All grid values (transport wind, mixing height, temperature) are converted using the unit-of-measure (`uom`) declared by the NWS API rather than hardcoded assumptions, so the Ventilation Index and dispersion categories match official data exactly.
 *   **Timestamp-aligned forecasts:** NWS time series are joined by timestamp (not array index), correctly handling multi-hour and multi-day duration encodings and gaps in grid coverage.
 *   **Timezone-correct dispersion modeling:** Atmospheric stability adjustments use the forecast location's local hour.
-*   **Hardened API layer:** All API routes validate coordinates, station IDs, dates, and payload sizes; security headers (X-Frame-Options, nosniff, Referrer-Policy) are applied site-wide.
+*   **Hardened API layer:** All API routes validate coordinates, station IDs, dates, and payload sizes; security headers (Content-Security-Policy, X-Frame-Options, nosniff, Referrer-Policy) are applied site-wide.
 
 ## 📄 Disclaimer
 This dashboard is a decision-support tool only. All burn decisions must be made by qualified prescribed fire managers using current field conditions. Always verify conditions on-site before ignition.
