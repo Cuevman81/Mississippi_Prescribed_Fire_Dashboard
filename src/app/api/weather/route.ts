@@ -5,6 +5,7 @@ const NWS_HEADERS = {
   'User-Agent': process.env.NWS_USER_AGENT || 'PrescribedBurnApp/3.0',
   'Accept': 'application/geo+json',
 };
+const UPSTREAM_TIMEOUT_MS = 10_000;
 
 export async function GET(request: NextRequest) {
   const limited = rateLimit(request, 20);
@@ -25,9 +26,11 @@ export async function GET(request: NextRequest) {
 
   try {
     // Step 1: Get point metadata (NWS office, grid, timezone)
+    // Built from the parsed numbers, never the raw query text; NWS asks for
+    // at most 4 decimal places
     const pointRes = await fetch(
-      `https://api.weather.gov/points/${lat},${lon}`,
-      { headers: NWS_HEADERS }
+      `https://api.weather.gov/points/${latNum.toFixed(4)},${lonNum.toFixed(4)}`,
+      { headers: NWS_HEADERS, signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS) }
     );
 
     if (!pointRes.ok) {
@@ -47,7 +50,7 @@ export async function GET(request: NextRequest) {
     };
 
     // Step 2: Get grid forecast data (72-hour hourly)
-    const gridRes = await fetch(props.forecastGridData, { headers: NWS_HEADERS });
+    const gridRes = await fetch(props.forecastGridData, { headers: NWS_HEADERS, signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS) });
     if (!gridRes.ok) {
       return NextResponse.json({ error: 'NWS grid data failed' }, { status: gridRes.status });
     }
@@ -56,7 +59,7 @@ export async function GET(request: NextRequest) {
     const gp = gridData.properties;
 
     // Step 3: Get narrative forecast
-    const forecastRes = await fetch(props.forecast, { headers: NWS_HEADERS });
+    const forecastRes = await fetch(props.forecast, { headers: NWS_HEADERS, signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS) });
     let narrativePeriods: unknown[] = [];
     if (forecastRes.ok) {
       const forecastData = await forecastRes.json();

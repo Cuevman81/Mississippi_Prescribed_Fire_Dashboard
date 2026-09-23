@@ -17,9 +17,18 @@ interface CountyWeather {
   source: 'NWS Live';
 }
 
-// Cache: county key → weather data, refreshed every 15 min
+// Cache: rounded location → weather data, refreshed every 15 min. Keyed on
+// the location only, so a different county spelling can't force a refetch.
 const cache = new Map<string, { data: CountyWeather; timestamp: number }>();
 const CACHE_TTL = 15 * 60 * 1000;
+
+// Mississippi has 82 counties, and the page sends one entry per county
+const MAX_COUNTIES = 82;
+// Each location costs 2 NWS calls; keep the burst small (NWS throttles by
+// User-Agent, so a burst here could throttle the whole app) and bounded
+const CONCURRENCY = 6;
+const UPSTREAM_TIMEOUT_MS = 10_000;
+const TOTAL_DEADLINE_MS = 20_000;
 
 /**
  * POST /api/permits/weather
@@ -40,8 +49,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Size limit to prevent DoS attacks
-    if (counties.length > 100) {
-      return NextResponse.json({ error: 'Too many counties (maximum 100)' }, { status: 400 });
+    if (counties.length > MAX_COUNTIES) {
+      return NextResponse.json({ error: `Too many counties (maximum ${MAX_COUNTIES})` }, { status: 400 });
     }
 
     // Data type and range verification
@@ -59,113 +68,34 @@ export async function POST(request: NextRequest) {
 
     const result: Record<string, CountyWeather> = {};
 
-    // Process each unique county
+    // Group entries by rounded location; answer cached ones straight away
+    const pending = new Map<string, { lat: number; lon: number; names: string[] }>();
     for (const { county, lat, lon } of counties) {
-      const cacheKey = `${county}_${lat.toFixed(2)}_${lon.toFixed(2)}`;
-
-      // Check cache
+      const cacheKey = `${lat.toFixed(2)}_${lon.toFixed(2)}`;
       const cached = cache.get(cacheKey);
       if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
         result[county] = cached.data;
         continue;
       }
-
-      try {
-        // Step 1: Get NWS grid metadata
-        const pointRes = await fetch(`https://api.weather.gov/points/${lat},${lon}`, {
-          headers: { 'User-Agent': NWS_UA },
-        });
-
-        if (!pointRes.ok) continue;
-
-        const pointData = await pointRes.json();
-        const gridUrl = pointData.properties?.forecastGridData;
-
-        if (!gridUrl) continue;
-
-        // Step 2: Fetch grid forecast
-        const gridRes = await fetch(gridUrl, {
-          headers: { 'User-Agent': NWS_UA },
-        });
-
-        if (!gridRes.ok) continue;
-
-        const gridData = await gridRes.json();
-        const props = gridData.properties;
-
-        // Step 3: Find current hour values
-        const now = Date.now();
-        const getValue = (series: { values?: Array<{ validTime: string; value: number }> }): number => {
-          if (!series?.values?.length) return 0;
-
-          for (const entry of series.values) {
-            const [start, duration] = entry.validTime.split('/');
-            const startMs = new Date(start).getTime();
-            // Parse ISO 8601 duration
-            const hours = parseISODuration(duration);
-            const endMs = startMs + hours * 3600000;
-
-            if (now >= startMs && now < endMs) {
-              return entry.value;
-            }
-          }
-
-          // Fallback: closest to now
-          let bestVal = series.values[0].value;
-          let bestDiff = Infinity;
-          for (const entry of series.values) {
-            const diff = Math.abs(new Date(entry.validTime.split('/')[0]).getTime() - now);
-            if (diff < bestDiff) {
-              bestDiff = diff;
-              bestVal = entry.value;
-            }
-          }
-          return bestVal;
-        };
-
-        // Extract current values with dynamic conversions based on uom
-        const windSpeedRaw = getValue(props.windSpeed);
-        const windSpeedMph = Math.round(convertNWSValue(windSpeedRaw, props.windSpeed?.uom, 'mph'));
-
-        const windGustRaw = getValue(props.windGust);
-        const windGustMph = Math.round(convertNWSValue(windGustRaw, props.windGust?.uom, 'mph'));
-
-        const windDirDeg = getValue(props.windDirection);
-
-        const mixingHeightRaw = getValue(props.mixingHeight);
-        const mixingHeightFt = Math.round(convertNWSValue(mixingHeightRaw, props.mixingHeight?.uom, 'ft'));
-
-        const transportWindRaw = getValue(props.transportWindSpeed);
-        const transportWindMph = Math.round(convertNWSValue(transportWindRaw, props.transportWindSpeed?.uom, 'mph'));
-
-        const transportWindDir = getValue(props.transportWindDirection);
-        const vi = mixingHeightFt * transportWindMph;
-
-        let dispersionQuality: string;
-        if (vi < 20000) dispersionQuality = 'Poor (Trapping)';
-        else if (vi < 40000) dispersionQuality = 'Fair';
-        else dispersionQuality = 'Good (Clearing)';
-
-        const weather: CountyWeather = {
-          windSpeed: windSpeedMph,
-          windGust: windGustMph,
-          windDirection: windDirDeg,
-          windDirectionCardinal: degreesToCardinal(windDirDeg),
-          mixingHeight: mixingHeightFt,
-          transportWindSpeed: transportWindMph,
-          transportWindDirection: transportWindDir,
-          ventilationIndex: Math.round(vi),
-          dispersionQuality,
-          source: 'NWS Live',
-        };
-
-        cache.set(cacheKey, { data: weather, timestamp: Date.now() });
-        result[county] = weather;
-      } catch {
-        // Skip this county on error
-        continue;
-      }
+      const entry = pending.get(cacheKey);
+      if (entry) entry.names.push(county);
+      else pending.set(cacheKey, { lat, lon, names: [county] });
     }
+
+    // Fetch the rest a few at a time, all under one deadline
+    const deadline = AbortSignal.timeout(TOTAL_DEADLINE_MS);
+    const jobs = [...pending.entries()];
+    let nextJob = 0;
+    const worker = async () => {
+      while (nextJob < jobs.length && !deadline.aborted) {
+        const [cacheKey, { lat, lon, names }] = jobs[nextJob++];
+        const weather = await fetchLocationWeather(lat, lon, deadline);
+        if (!weather) continue; // Skip this location on error
+        cache.set(cacheKey, { data: weather, timestamp: Date.now() });
+        for (const name of names) result[name] = weather;
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(CONCURRENCY, jobs.length) }, worker));
 
     return NextResponse.json(result);
   } catch (err) {
@@ -174,7 +104,104 @@ export async function POST(request: NextRequest) {
   }
 }
 
+/** NWS point + grid lookup for one location; null if NWS fails or times out. */
+async function fetchLocationWeather(lat: number, lon: number, deadline: AbortSignal): Promise<CountyWeather | null> {
+  const signal = AbortSignal.any([deadline, AbortSignal.timeout(UPSTREAM_TIMEOUT_MS)]);
+  try {
+    // Step 1: Get NWS grid metadata
+    const pointRes = await fetch(`https://api.weather.gov/points/${lat.toFixed(4)},${lon.toFixed(4)}`, {
+      headers: { 'User-Agent': NWS_UA },
+      signal,
+    });
 
+    if (!pointRes.ok) return null;
+
+    const pointData = await pointRes.json();
+    const gridUrl = pointData.properties?.forecastGridData;
+
+    if (!gridUrl) return null;
+
+    // Step 2: Fetch grid forecast
+    const gridRes = await fetch(gridUrl, {
+      headers: { 'User-Agent': NWS_UA },
+      signal,
+    });
+
+    if (!gridRes.ok) return null;
+
+    const gridData = await gridRes.json();
+    const props = gridData.properties;
+
+    // Step 3: Find current hour values
+    const now = Date.now();
+    const getValue = (series: { values?: Array<{ validTime: string; value: number }> }): number => {
+      if (!series?.values?.length) return 0;
+
+      for (const entry of series.values) {
+        const [start, duration] = entry.validTime.split('/');
+        const startMs = new Date(start).getTime();
+        // Parse ISO 8601 duration
+        const hours = parseISODuration(duration);
+        const endMs = startMs + hours * 3600000;
+
+        if (now >= startMs && now < endMs) {
+          return entry.value;
+        }
+      }
+
+      // Fallback: closest to now
+      let bestVal = series.values[0].value;
+      let bestDiff = Infinity;
+      for (const entry of series.values) {
+        const diff = Math.abs(new Date(entry.validTime.split('/')[0]).getTime() - now);
+        if (diff < bestDiff) {
+          bestDiff = diff;
+          bestVal = entry.value;
+        }
+      }
+      return bestVal;
+    };
+
+    // Extract current values with dynamic conversions based on uom
+    const windSpeedRaw = getValue(props.windSpeed);
+    const windSpeedMph = Math.round(convertNWSValue(windSpeedRaw, props.windSpeed?.uom, 'mph'));
+
+    const windGustRaw = getValue(props.windGust);
+    const windGustMph = Math.round(convertNWSValue(windGustRaw, props.windGust?.uom, 'mph'));
+
+    const windDirDeg = getValue(props.windDirection);
+
+    const mixingHeightRaw = getValue(props.mixingHeight);
+    const mixingHeightFt = Math.round(convertNWSValue(mixingHeightRaw, props.mixingHeight?.uom, 'ft'));
+
+    const transportWindRaw = getValue(props.transportWindSpeed);
+    const transportWindMph = Math.round(convertNWSValue(transportWindRaw, props.transportWindSpeed?.uom, 'mph'));
+
+    const transportWindDir = getValue(props.transportWindDirection);
+    const vi = mixingHeightFt * transportWindMph;
+
+    let dispersionQuality: string;
+    if (vi < 20000) dispersionQuality = 'Poor (Trapping)';
+    else if (vi < 40000) dispersionQuality = 'Fair';
+    else dispersionQuality = 'Good (Clearing)';
+
+    const weather: CountyWeather = {
+      windSpeed: windSpeedMph,
+      windGust: windGustMph,
+      windDirection: windDirDeg,
+      windDirectionCardinal: degreesToCardinal(windDirDeg),
+      mixingHeight: mixingHeightFt,
+      transportWindSpeed: transportWindMph,
+      transportWindDirection: transportWindDir,
+      ventilationIndex: Math.round(vi),
+      dispersionQuality,
+      source: 'NWS Live',
+    };
+    return weather;
+  } catch {
+    return null;
+  }
+}
 
 function degreesToCardinal(deg: number): string {
   const dirs = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];

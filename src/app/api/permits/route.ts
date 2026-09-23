@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
     const appId = '14bb6f3f82b14f8e9df45eff193b809a';
     const appRes = await fetch(
       `https://mfcgis.maps.arcgis.com/sharing/rest/content/items/${appId}/data?f=json`,
-      { next: { revalidate: META_REVALIDATE } }
+      { next: { revalidate: META_REVALIDATE }, signal: AbortSignal.timeout(10_000) }
     );
 
     if (!appRes.ok) {
@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
     // Step 2: Get webmap data to find the layer URL
     const mapRes = await fetch(
       `https://mfcgis.maps.arcgis.com/sharing/rest/content/items/${webmapId}/data?f=json`,
-      { next: { revalidate: META_REVALIDATE } }
+      { next: { revalidate: META_REVALIDATE }, signal: AbortSignal.timeout(10_000) }
     );
 
     if (!mapRes.ok) {
@@ -136,6 +136,7 @@ async function pullArcGISData(baseUrl: string): Promise<Record<string, unknown>[
 
     const res = await fetch(`${baseUrl}/query?${params}`, {
       next: { revalidate: DATA_REVALIDATE },
+      signal: AbortSignal.timeout(10_000),
     });
     if (!res.ok) break;
 

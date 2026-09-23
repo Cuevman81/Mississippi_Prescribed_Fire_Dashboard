@@ -26,6 +26,7 @@ export async function GET(request: NextRequest) {
           headers: {
             'User-Agent': process.env.NWS_USER_AGENT || 'PrescribedBurnApp/3.0',
           },
+          signal: AbortSignal.timeout(10_000),
         }
       );
 
@@ -53,6 +54,7 @@ export async function GET(request: NextRequest) {
           'User-Agent': process.env.NWS_USER_AGENT || 'PrescribedBurnApp/3.0',
         },
         next: { revalidate: 86400 },
+        signal: AbortSignal.timeout(10_000),
       }
     );
 

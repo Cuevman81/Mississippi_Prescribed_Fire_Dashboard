@@ -62,6 +62,7 @@ export async function GET(request: NextRequest) {
         elems: [{ name: 'maxt' }, { name: 'pcpn' }],
       }),
       next: { revalidate: 21600 }, // 6 h — daily data, ~1-day lag
+      signal: AbortSignal.timeout(15_000),
     });
 
     if (!res.ok) {

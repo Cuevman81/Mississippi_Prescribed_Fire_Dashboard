@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const url = 'https://droughtmonitor.unl.edu/data/shapefiles_m/USDM_current_M.zip';
-    const res = await fetch(url, { next: { revalidate: REVALIDATE_SECONDS } });
+    const res = await fetch(url, { next: { revalidate: REVALIDATE_SECONDS }, signal: AbortSignal.timeout(20_000) });
 
     if (!res.ok) {
       return NextResponse.json({ error: 'Drought data unavailable' }, { status: res.status });
