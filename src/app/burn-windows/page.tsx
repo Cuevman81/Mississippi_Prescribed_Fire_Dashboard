@@ -5,7 +5,7 @@ import { useDashboard } from '@/lib/dashboard-context';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Clock, CheckCircle } from 'lucide-react';
-import { getBurnQualityColor } from '@/lib/constants';
+import { getBurnQualityColor, getBurnQualityTextColor } from '@/lib/constants';
 import { formatNumber } from '@/lib/weather-utils';
 import type { BurnWindow, HourlyForecast } from '@/lib/types';
 
@@ -169,8 +169,8 @@ export default function BurnWindowsPage() {
                   <div className="flex items-center justify-between mb-2">
                     <p className="font-medium text-sm">{w.date}</p>
                     <Badge
-                      className="text-white text-[10px]"
-                      style={{ backgroundColor: getBurnQualityColor(w.avgBurnScore) }}
+                      className="text-[10px]"
+                      style={{ backgroundColor: getBurnQualityColor(w.avgBurnScore), color: getBurnQualityTextColor(w.avgBurnScore) }}
                     >
                       {w.burnQuality}
                     </Badge>
@@ -254,7 +254,7 @@ export default function BurnWindowsPage() {
                         className="aspect-square rounded-sm cursor-pointer transition-transform hover:scale-110 hover:z-10 relative flex items-center justify-center text-[9px] font-bold select-none"
                         style={{
                           backgroundColor: cell ? getBurnQualityColor(cell.score) : '#f1f5f9',
-                          color: cell && cell.score >= 50 && cell.score < 70 ? '#000000' : '#ffffff',
+                          color: cell ? getBurnQualityTextColor(cell.score) : '#ffffff',
                           minHeight: '20px',
                         }}
                         onMouseEnter={() => cell && setHoveredCell({ day, hour: h, score: cell.score, quality: cell.quality, reasons: cell.reasons })}

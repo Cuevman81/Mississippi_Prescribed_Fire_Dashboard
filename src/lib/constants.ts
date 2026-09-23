@@ -63,6 +63,15 @@ export function getBurnQualityColor(score: number): string {
   return BURN_QUALITY.POOR.color;
 }
 
+/**
+ * Text colour for labels drawn on getBurnQualityColor(). Black meets WCAG
+ * AA (4.5:1) on every band but Poor red, where white does: Excellent 6.4,
+ * Good 9.2, Fair 11.0, Marginal 7.5 with black; Poor 4.8 with white.
+ */
+export function getBurnQualityTextColor(score: number): string {
+  return score >= BURN_QUALITY.MARGINAL.min ? '#000000' : '#ffffff';
+}
+
 export function getBurnQualityLabel(score: number): string {
   if (score >= 90) return 'Excellent';
   if (score >= 70) return 'Good';
