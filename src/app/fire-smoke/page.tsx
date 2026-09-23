@@ -7,12 +7,14 @@ import { Label } from '@/components/ui/label';
 import { Loader2, Flame } from 'lucide-react';
 import type { HMSData } from '@/lib/types';
 import { HMS_REGIONS, DEFAULT_HMS_REGION } from '@/lib/constants';
+import { getTodayStr } from '@/lib/utils';
 import dynamic from 'next/dynamic';
 
 const HMSMap = dynamic(() => import('@/components/maps/HMSFireSmokeMap'), { ssr: false });
 
 export default function FireSmokePage() {
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  // Local (Central) date: the UTC date is already tomorrow from 7 PM CDT on
+  const [date, setDate] = useState(() => getTodayStr());
   const [region, setRegion] = useState(DEFAULT_HMS_REGION);
   const [hmsData, setHmsData] = useState<HMSData | null>(null);
   const [loading, setLoading] = useState(false);
@@ -67,7 +69,7 @@ export default function FireSmokePage() {
               <Input
                 type="date"
                 value={date}
-                max={new Date().toISOString().split('T')[0]}
+                max={getTodayStr()}
                 onChange={(e) => setDate(e.target.value)}
                 className="w-40 text-sm"
               />
@@ -99,6 +101,9 @@ export default function FireSmokePage() {
                   Showing {regionConfig.label}
                 </span>
               </div>
+              {hmsData.error && (
+                <p className="mt-2 text-xs font-medium text-amber-700">{hmsData.error}</p>
+              )}
             </div>
           ) : loading ? (
             <div className="flex items-center justify-center h-96">

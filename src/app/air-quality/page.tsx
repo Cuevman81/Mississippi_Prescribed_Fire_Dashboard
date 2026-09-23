@@ -4,22 +4,24 @@ import { useDashboard } from '@/lib/dashboard-context';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, Wind } from 'lucide-react';
 import { getAQIColor, getAQITextColor, getAQIRecommendation, shouldAvoidBurning } from '@/lib/aqi-utils';
+import { getTodayStr } from '@/lib/utils';
 import dynamic from 'next/dynamic';
 import { useMemo } from 'react';
 
 const MonitorMap = dynamic(() => import('@/components/maps/MonitorMap'), { ssr: false });
 
 export default function AirQualityPage() {
-  const { currentAQI, aqiForecast, aqiMonitors, isLoading, location } = useDashboard();
+  const { currentAQI, aqiForecast, aqiMonitors, isLoading, location, timezone } = useDashboard();
 
-  // Separate forecasts by date
+  // Separate forecasts by date. AirNow forecast dates are the reporting
+  // area's local date; toISOString() is UTC, which is already "tomorrow"
+  // from 7 PM CDT on.
   const { today, tomorrowDate } = useMemo(() => {
-    const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
-    const tomorrow = new Date(now.getTime() + 86400000);
-    const tomorrowStr = tomorrow.toISOString().split('T')[0];
+    const todayStr = getTodayStr(timezone);
+    const [y, m, d] = todayStr.split('-').map(Number);
+    const tomorrowStr = new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10);
     return { today: todayStr, tomorrowDate: tomorrowStr };
-  }, []);
+  }, [timezone]);
 
   if (isLoading) {
     return (

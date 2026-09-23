@@ -46,7 +46,8 @@ export async function GET(request: NextRequest) {
   if (limited) return limited;
 
   const regionParam = request.nextUrl.searchParams.get('region') || DEFAULT_HMS_REGION;
-  const region = HMS_REGIONS[regionParam];
+  // hasOwn, so inherited names like "constructor" don't pass the allowlist
+  const region = Object.hasOwn(HMS_REGIONS, regionParam) ? HMS_REGIONS[regionParam] : undefined;
   if (!region) {
     return NextResponse.json(
       { error: `Invalid region. Use one of: ${Object.keys(HMS_REGIONS).join(', ')}` },
@@ -139,15 +140,28 @@ export async function GET(request: NextRequest) {
       };
     }
 
+    // No fire file is not the same as no fires: HMS publishes each day's
+    // file some time after 00Z. Say so, and cache the answer only briefly
+    // so the CDN picks the file up once it appears.
+    const fireError =
+      fires.status === 'rejected'
+        ? 'HMS fire data for this date could not be loaded'
+        : fires.value === null
+          ? 'HMS has not published fire data for this date yet'
+          : undefined;
+
     return NextResponse.json({
       fires: firePoints,
       smoke: smokeGeoJSON,
       date: `${year}-${month}-${day}`,
       region: regionParam,
       totalFires,
+      ...(fireError ? { error: fireError } : {}),
     }, {
       headers: {
-        'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=300'
+        'Cache-Control': fireError
+          ? 'public, s-maxage=300, stale-while-revalidate=60'
+          : 'public, s-maxage=3600, stale-while-revalidate=300'
       }
     });
   } catch (err) {
@@ -162,7 +176,7 @@ export async function GET(request: NextRequest) {
 }
 
 async function fetchAndParseShapefile(url: string): Promise<GeoJSON.FeatureCollection | null> {
-  const res = await fetch(url, { next: { revalidate: 3600 } });
+  const res = await fetch(url, { next: { revalidate: 3600 }, signal: AbortSignal.timeout(20_000) });
   if (!res.ok) return null;
 
   const buffer = await res.arrayBuffer();

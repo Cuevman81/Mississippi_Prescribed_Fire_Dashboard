@@ -178,6 +178,8 @@ export interface HMSData {
   region?: string;
   /** Total detections in the region before the render cap was applied */
   totalFires?: number;
+  /** Set when the day's HMS fire file is missing or unreadable */
+  error?: string;
 }
 
 // --- MFC Permits ---
