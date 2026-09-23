@@ -125,6 +125,8 @@ export function CurrentConditions() {
         {stationObservation && (
           <p className="col-span-2 lg:col-span-4 text-xs text-slate-400 -mt-1">
             Real-time from {stationObservation.stationName} ({stationObservation.stationId}) — {stationObservation.distanceMiles} mi away
+            {stationObservation.time && !isNaN(Date.parse(stationObservation.time)) &&
+              ` · observed ${new Date(stationObservation.time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`}
           </p>
         )}
         {!stationObservation && nowForecast && (

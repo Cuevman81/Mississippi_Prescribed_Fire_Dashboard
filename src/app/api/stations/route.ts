@@ -12,70 +12,45 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Try multiple network formats — MS stations often use state-prefixed networks
-    const networks = ['ASOS', `MS_ASOS`, 'AWOS', `MS_AWOS`];
-
-    for (const network of networks) {
-      try {
-        const res = await fetch(
-          `https://mesonet.agron.iastate.edu/json/current.py?station=${stationId}&network=${network}`
-        );
-
-        if (res.ok) {
-          const data = await res.json();
-          const formatted = formatStationData(data);
-          if ((formatted as Record<string, unknown>).hasData) {
-            return NextResponse.json(formatted);
-          }
-        }
-      } catch {
-        // Try next network
-      }
+    // IEM's currents API works for any network (MS_ASOS, AK_ASOS, AWOS...)
+    // and returns the METAR fields we read. The older json/current.py
+    // endpoint uses different field names (airtemp[F], windspeed[kt]) and
+    // returned hasData with no temperature, humidity or wind.
+    const res = await fetch(
+      `https://mesonet.agron.iastate.edu/api/1/currents.json?station=${encodeURIComponent(stationId)}`,
+      { signal: AbortSignal.timeout(8_000) }
+    );
+    if (!res.ok) {
+      return NextResponse.json({ error: 'Station data unavailable', hasData: false }, { status: 502 });
     }
 
-    // Fallback: try the station without network restriction using the geojson endpoint
-    try {
-      const res = await fetch(
-        `https://mesonet.agron.iastate.edu/geojson/network/MS_ASOS.geojson`
-      );
-      if (res.ok) {
-        const geoData = await res.json();
-        const feature = geoData.features?.find(
-          (f: Record<string, unknown>) =>
-            (f.properties as Record<string, string>)?.sid === stationId
-        );
-        if (feature?.properties) {
-          const p = feature.properties as Record<string, unknown>;
-          return NextResponse.json({
-            hasData: true,
-            stationId: p.sid,
-            temp: p.tmpf,
-            humidity: p.relh,
-            windSpeed: p.sknt != null ? Math.round((p.sknt as number) * 1.15078 * 10) / 10 : null,
-            windDirection: p.drct,
-            windGust: p.gust != null ? Math.round((p.gust as number) * 1.15078 * 10) / 10 : null,
-            visibility: p.vsby,
-            time: p.local_valid,
-            rawTime: p.utc_valid,
-          });
-        }
-      }
-    } catch {
-      // Fallback also failed
-    }
+    const payload = await res.json();
+    const rows = ((payload?.data ?? []) as Record<string, unknown>[])
+      .filter((r) => String(r.station ?? '').toUpperCase() === stationId.toUpperCase())
+      // Newest observation first if the ID appears in more than one network
+      .sort((a, b) => String(b.utc_valid ?? '').localeCompare(String(a.utc_valid ?? '')));
 
-    return NextResponse.json({ error: 'Station data unavailable', hasData: false }, { status: 404 });
+    const formatted = rows.length ? formatStationData(rows[0]) : null;
+    if (!formatted) {
+      return NextResponse.json({ error: 'No recent observation', hasData: false }, { status: 404 });
+    }
+    return NextResponse.json(formatted);
   } catch (err) {
     console.error('Station API error:', err);
     return NextResponse.json({ error: 'Station service unavailable', hasData: false }, { status: 500 });
   }
 }
 
-function formatStationData(data: Record<string, unknown>): Record<string, unknown> {
-  const obs = data.last_ob as Record<string, unknown> | undefined;
-  if (!obs) {
-    return { error: 'No observations available', hasData: false };
-  }
+// Routine ASOS/AWOS reports are hourly; an observation older than this has
+// missed at least one, so the dashboard falls back to the forecast hour
+// instead of calling it real-time
+const MAX_OBS_AGE_MS = 2 * 3600 * 1000;
+
+function formatStationData(obs: Record<string, unknown>): Record<string, unknown> | null {
+  const utcValid = typeof obs.utc_valid === 'string' ? obs.utc_valid : '';
+  const obsMs = Date.parse(utcValid);
+  if (!Number.isFinite(obsMs) || Date.now() - obsMs > MAX_OBS_AGE_MS) return null;
+  if (obs.tmpf == null && obs.relh == null && obs.sknt == null) return null;
 
   // Convert wind speed from knots to mph
   const windSpeedKnots = obs.sknt as number | null;
@@ -91,6 +66,6 @@ function formatStationData(data: Record<string, unknown>): Record<string, unknow
     windGust: windGustKnots != null ? Math.round(windGustKnots * 1.15078 * 10) / 10 : null,
     visibility: obs.vsby,
     time: obs.local_valid,
-    rawTime: obs.utc_valid,
+    rawTime: utcValid,
   };
 }

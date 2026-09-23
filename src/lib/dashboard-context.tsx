@@ -362,7 +362,8 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
               windDirectionCardinal: stationData.windDirection ? degreesToCardinal(stationData.windDirection) : '',
               windGust: stationData.windGust,
               visibility: stationData.visibility,
-              time: stationData.time,
+              // UTC ISO time, so the browser formats it in its own zone
+              time: stationData.rawTime || stationData.time,
               distanceMiles: Math.round(distMiles * 10) / 10,
             });
           }
