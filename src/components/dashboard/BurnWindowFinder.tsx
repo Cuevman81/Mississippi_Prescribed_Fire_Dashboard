@@ -4,6 +4,8 @@ import { useDashboard } from '@/lib/dashboard-context';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Clock, Calendar, AlertCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { rxViolations, vetoesForWindow } from '@/lib/burn-windows';
+import { useWindowRestrictions, WindowRestrictionsNotice, VetoedTag } from './WindowRestrictions';
 
 interface BurnWindow {
     startIndex: number;
@@ -17,7 +19,8 @@ interface BurnWindow {
 }
 
 export function BurnWindowFinder() {
-    const { forecast, currentForecastIdx, prescription } = useDashboard();
+    const { forecast, currentForecastIdx, prescription, timezone } = useDashboard();
+    const restrictions = useWindowRestrictions();
 
     if (!forecast.length) return null;
 
@@ -32,14 +35,7 @@ export function BurnWindowFinder() {
         const f = forecast[i];
 
         // Check if hour is strictly within prescription
-        const isGood =
-            f.temp >= prescription.tempMin &&
-            f.temp <= prescription.tempMax &&
-            f.humidity >= prescription.humidityMin &&
-            f.humidity <= prescription.humidityMax &&
-            f.windSpeed >= prescription.windSpeedMin &&
-            f.windSpeed <= prescription.windSpeedMax &&
-            f.ventilationIndex >= prescription.minVentilationIndex;
+        const isGood = rxViolations(f, prescription).length === 0;
 
         let isContiguous = true;
         if (currentWindow) {
@@ -116,6 +112,7 @@ export function BurnWindowFinder() {
                     </span>
                 </CardHeader>
                 <CardContent>
+                    <WindowRestrictionsNotice restrictions={restrictions} />
                     {windows.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-6 text-center">
                             <AlertCircle className="w-8 h-8 text-amber-500/50 mb-2" />
@@ -127,28 +124,33 @@ export function BurnWindowFinder() {
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                             {windows.slice(0, 3).map((w, idx) => {
-                                const startStr = w.startTime.toLocaleTimeString('en-US', { hour: 'numeric', hour12: true });
-                                const endStr = new Date(w.endTime.getTime() + 3600000).toLocaleTimeString('en-US', { hour: 'numeric', hour12: true });
-                                const dayStr = w.startTime.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+                                // Forecast location's time, not the browser's
+                                const startStr = w.startTime.toLocaleTimeString('en-US', { timeZone: timezone, hour: 'numeric', hour12: true });
+                                const endStr = new Date(w.endTime.getTime() + 3600000).toLocaleTimeString('en-US', { timeZone: timezone, hour: 'numeric', hour12: true });
+                                const dayStr = w.startTime.toLocaleDateString('en-US', { timeZone: timezone, weekday: 'short', month: 'short', day: 'numeric' });
 
                                 const avgTemp = Math.round(w.temps.reduce((a: number, b: number) => a + b, 0) / w.hours);
                                 const avgRH = Math.round(w.rhs.reduce((a: number, b: number) => a + b, 0) / w.hours);
                                 const avgWind = Math.round((w.winds.reduce((a: number, b: number) => a + b, 0) / w.hours) * 10) / 10;
+                                const vetoed = vetoesForWindow(restrictions, w.startTime.getTime()).length > 0;
 
                                 return (
-                                    <div key={idx} className="bg-white border border-green-200 rounded-xl p-4 shadow-sm relative overflow-hidden">
-                                        <div className="absolute top-0 left-0 w-1 h-full bg-green-500" />
+                                    <div key={idx} className={`bg-white border rounded-xl p-4 shadow-sm relative overflow-hidden ${vetoed ? 'border-red-300' : 'border-green-200'}`}>
+                                        <div className={`absolute top-0 left-0 w-1 h-full ${vetoed ? 'bg-red-600' : 'bg-green-500'}`} />
                                         <div className="flex justify-between items-start mb-3">
                                             <div>
-                                                <div className="flex items-center gap-1.5 text-xs font-bold text-green-700 bg-green-50 px-2 py-1 rounded w-fit mb-2">
+                                                <div className={`flex items-center gap-1.5 text-xs font-bold px-2 py-1 rounded w-fit mb-2 ${vetoed ? 'text-slate-600 bg-slate-100' : 'text-green-700 bg-green-50'}`}>
                                                     <Calendar className="w-3 h-3" />
                                                     {dayStr}
                                                 </div>
-                                                <h4 className="font-bold text-slate-800">{startStr} - {endStr}</h4>
+                                                <h4 className={`font-bold ${vetoed ? 'text-slate-500 line-through' : 'text-slate-800'}`}>{startStr} - {endStr}</h4>
                                             </div>
-                                            <span className="bg-green-100 text-green-800 text-xs font-extrabold px-2.5 py-1 rounded-full">
-                                                {w.hours} hrs
-                                            </span>
+                                            <div className="flex flex-col items-end gap-1">
+                                                <span className={`text-xs font-extrabold px-2.5 py-1 rounded-full ${vetoed ? 'bg-slate-100 text-slate-600' : 'bg-green-100 text-green-800'}`}>
+                                                    {w.hours} hrs
+                                                </span>
+                                                {vetoed && <VetoedTag />}
+                                            </div>
                                         </div>
 
                                         <div className="grid grid-cols-3 gap-2 text-center mt-3 pt-3 border-t border-slate-100">

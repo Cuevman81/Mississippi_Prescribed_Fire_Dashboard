@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Search, Loader2, MapPin } from 'lucide-react';
+import { Search, Loader2, MapPin, SlidersHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
@@ -60,12 +60,14 @@ export function Header() {
       )}
 
       {/* Right side controls & Logo */}
-      <div className="ml-auto flex items-center gap-4">
+      <div className="ml-auto flex items-center gap-2 sm:gap-4">
         {/* Prescription parameters toggle */}
         <Sheet open={showParams} onOpenChange={setShowParams}>
           <SheetTrigger asChild>
-            <Button variant="outline" size="sm" className="hidden sm:flex">
-              Rx Parameters
+            {/* Icon-only on phones, so the prescription is editable there too */}
+            <Button variant="outline" size="sm" aria-label="Rx Parameters" title="Rx Parameters">
+              <SlidersHorizontal className="h-4 w-4" />
+              <span className="hidden sm:inline">Rx Parameters</span>
             </Button>
           </SheetTrigger>
           <SheetContent className="overflow-y-auto">

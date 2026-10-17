@@ -7,7 +7,7 @@ import { EXEMPTION_LABELS, formatBanTime } from '@/lib/burn-bans';
 import { useEffect } from 'react';
 
 export default function PrintPlanPage() {
-  const { location, forecast, currentForecastIdx, prescription, stationObservation, alerts, alertsAvailable, burnBans, burnBanStatus } = useDashboard();
+  const { location, forecast, currentForecastIdx, prescription, stationObservation, alerts, alertsAvailable, burnBans, burnBanStatus, timezone } = useDashboard();
 
   useEffect(() => {
     // Optional: automatically trigger print dialog
@@ -23,7 +23,9 @@ export default function PrintPlanPage() {
   }
 
   const now = forecast[currentForecastIdx];
+  // Dates and times on the plan are in the burn location's time zone
   const today = new Date().toLocaleDateString('en-US', {
+    timeZone: timezone,
     weekday: 'long',
     month: 'long',
     day: 'numeric',
@@ -42,7 +44,7 @@ export default function PrintPlanPage() {
         </div>
         <div className="text-right text-sm">
           <p className="font-bold">{today}</p>
-          <p>Generated at: {new Date().toLocaleTimeString()}</p>
+          <p>Generated at: {new Date().toLocaleTimeString('en-US', { timeZone: timezone, hour: 'numeric', minute: '2-digit', timeZoneName: 'short' })}</p>
         </div>
       </div>
       
@@ -219,7 +221,7 @@ export default function PrintPlanPage() {
             {forecast.slice(currentForecastIdx, currentForecastIdx + 12).map((h, i) => (
               <tr key={i}>
                 <td className="border p-2 font-medium">
-                  {new Date(h.time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                  {new Date(h.time).toLocaleTimeString('en-US', { timeZone: timezone, hour: 'numeric', minute: '2-digit' })}
                 </td>
                 <td className="border p-2 text-center">{h.temp}°F</td>
                 <td className="border p-2 text-center">{h.humidity}%</td>
@@ -265,7 +267,7 @@ export default function PrintPlanPage() {
           </div>
           <div className="ml-8 text-right text-[10px] text-slate-400">
             <p>Source: Prescribed Fire Weather Dashboard v3.0</p>
-            <p>Data: NWS, AirNow, NOAA HMS</p>
+            <p>Data: NWS, AirNow, NOAA HMS, MFC, IEM</p>
           </div>
         </div>
       </div>

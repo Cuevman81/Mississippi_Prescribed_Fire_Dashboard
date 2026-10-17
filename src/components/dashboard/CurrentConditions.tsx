@@ -7,7 +7,7 @@ import { formatNumber } from '@/lib/weather-utils';
 import { motion } from 'framer-motion';
 
 export function CurrentConditions() {
-  const { forecast, currentForecastIdx, stationObservation, prescription, lastUpdated } = useDashboard();
+  const { forecast, currentForecastIdx, stationObservation, prescription, lastUpdated, timezone } = useDashboard();
 
   // Use the forecast hour closest to now (not forecast[0] which may be stale)
   const nowForecast = forecast[currentForecastIdx] || forecast[0];
@@ -126,12 +126,12 @@ export function CurrentConditions() {
           <p className="col-span-2 lg:col-span-4 text-xs text-slate-400 -mt-1">
             Real-time from {stationObservation.stationName} ({stationObservation.stationId}) — {stationObservation.distanceMiles} mi away
             {stationObservation.time && !isNaN(Date.parse(stationObservation.time)) &&
-              ` · observed ${new Date(stationObservation.time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`}
+              ` · observed ${new Date(stationObservation.time).toLocaleTimeString('en-US', { timeZone: timezone, hour: 'numeric', minute: '2-digit', hour12: true, timeZoneName: 'short' })}`}
           </p>
         )}
         {!stationObservation && nowForecast && (
           <p className="col-span-2 lg:col-span-4 text-xs text-orange-500 -mt-1">
-            Showing NWS forecast data for {new Date(nowForecast.time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })} (real-time station unavailable)
+            Showing NWS forecast data for {new Date(nowForecast.time).toLocaleTimeString('en-US', { timeZone: timezone, hour: 'numeric', minute: '2-digit', hour12: true, timeZoneName: 'short' })} (real-time station unavailable)
           </p>
         )}
       </div>

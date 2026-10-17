@@ -15,7 +15,7 @@ import {
 } from 'recharts';
 
 export function BurnQualityChart() {
-  const { forecast, currentForecastIdx } = useDashboard();
+  const { forecast, currentForecastIdx, timezone } = useDashboard();
 
   if (!forecast.length) return null;
 
@@ -23,7 +23,7 @@ export function BurnQualityChart() {
   const data = forecast.slice(currentForecastIdx, currentForecastIdx + 24).map((h) => {
     const d = new Date(h.time);
     return {
-      time: d.toLocaleTimeString('en-US', { hour: 'numeric', hour12: true }),
+      time: d.toLocaleTimeString('en-US', { timeZone: timezone, hour: 'numeric', hour12: true }),
       score: h.burnScore,
       quality: h.burnQuality,
       color: getBurnQualityColor(h.burnScore),

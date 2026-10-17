@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import shp from 'shpjs';
 import { rateLimit } from '@/lib/rate-limit';
+import { usdmValidDate } from '@/lib/drought';
 
 // USDM updates weekly (Thursdays); cache upstream fetch in Next's shared
 // data cache and CDN-cache the route response for 6 hours.
@@ -24,11 +25,12 @@ export async function GET(request: NextRequest) {
     const buffer = await res.arrayBuffer();
     const geojson = await shp(buffer);
 
-    let featureCollection: GeoJSON.FeatureCollection;
+    // shpjs tags each layer with its shapefile name, which carries the map date
+    let featureCollection: GeoJSON.FeatureCollection & { fileName?: string };
     if (Array.isArray(geojson)) {
-      featureCollection = geojson[0] as GeoJSON.FeatureCollection;
+      featureCollection = geojson[0];
     } else {
-      featureCollection = geojson as GeoJSON.FeatureCollection;
+      featureCollection = geojson;
     }
 
     // Add drought category labels
@@ -56,7 +58,9 @@ export async function GET(request: NextRequest) {
 
     const dataWithMeta = {
       ...processed,
-      lastUpdated: new Date().toISOString(),
+      // USDM map valid date (YYYY-MM-DD), or null if the file name didn't say
+      validDate: usdmValidDate(featureCollection.fileName),
+      fetchedAt: new Date().toISOString(),
     };
 
     return NextResponse.json(dataWithMeta, { headers: CACHE_HEADERS });

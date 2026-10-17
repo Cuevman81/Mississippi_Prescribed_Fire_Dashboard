@@ -84,6 +84,9 @@ export async function GET(request: NextRequest) {
               severity: f.properties.severity,
               onset: f.properties.onset,
               expires: f.properties.expires,
+              // When the hazard itself ends; `expires` is only when this
+              // message lapses and can be earlier
+              ends: f.properties.ends ?? null,
             }));
           alertsAvailable = true;
         }

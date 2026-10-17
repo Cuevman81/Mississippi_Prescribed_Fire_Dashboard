@@ -13,7 +13,7 @@ import {
 } from 'recharts';
 
 export function WeatherTrendChart() {
-  const { forecast, currentForecastIdx } = useDashboard();
+  const { forecast, currentForecastIdx, timezone } = useDashboard();
 
   if (!forecast.length) return null;
 
@@ -22,6 +22,7 @@ export function WeatherTrendChart() {
     const d = new Date(h.time);
     return {
       time: d.toLocaleString('en-US', {
+        timeZone: timezone,
         weekday: 'short',
         hour: 'numeric',
         hour12: true,

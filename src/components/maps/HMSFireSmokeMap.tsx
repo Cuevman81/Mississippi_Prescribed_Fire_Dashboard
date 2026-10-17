@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { MapContainer, TileLayer, CircleMarker, Popup, GeoJSON, LayersControl, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, CircleMarker, Popup, GeoJSON, LayersControl, LayerGroup, useMap } from 'react-leaflet';
 import type { HMSData } from '@/lib/types';
 import { SMOKE_COLORS } from '@/lib/constants';
 import { LightGrayBasemap } from './Basemap';
@@ -75,36 +75,34 @@ export default function HMSFireSmokeMap({ data, center = [33, -88], zoom = 5 }: 
         )}
 
         <Overlay checked name="Fire Detections">
-          {/* We wrap circles in a fragment via the LayersControl */}
-          <></>
+          <LayerGroup>
+            {data.fires.map((fire, i) => {
+              const radius = Math.max(3, Math.min(15, Math.log(fire.frp + 1) * 2));
+              return (
+                <CircleMarker
+                  key={i}
+                  center={[fire.lat, fire.lon]}
+                  radius={radius}
+                  fillColor="#dc2626"
+                  fillOpacity={0.7}
+                  color="#991b1b"
+                  weight={1}
+                >
+                  <Popup>
+                    <div className="text-xs">
+                      <p className="font-bold">Fire Detection</p>
+                      <p>Time: {fire.time} UTC</p>
+                      <p>Satellite: {fire.satellite}</p>
+                      <p>Method: {fire.method}</p>
+                      <p>FRP: {fire.frp} MW</p>
+                    </div>
+                  </Popup>
+                </CircleMarker>
+              );
+            })}
+          </LayerGroup>
         </Overlay>
       </LayersControl>
-
-      {/* Fire detection markers */}
-      {data.fires.map((fire, i) => {
-        const radius = Math.max(3, Math.min(15, Math.log(fire.frp + 1) * 2));
-        return (
-          <CircleMarker
-            key={i}
-            center={[fire.lat, fire.lon]}
-            radius={radius}
-            fillColor="#dc2626"
-            fillOpacity={0.7}
-            color="#991b1b"
-            weight={1}
-          >
-            <Popup>
-              <div className="text-xs">
-                <p className="font-bold">Fire Detection</p>
-                <p>Time: {fire.time} UTC</p>
-                <p>Satellite: {fire.satellite}</p>
-                <p>Method: {fire.method}</p>
-                <p>FRP: {fire.frp} MW</p>
-              </div>
-            </Popup>
-          </CircleMarker>
-        );
-      })}
     </MapContainer>
   );
 }

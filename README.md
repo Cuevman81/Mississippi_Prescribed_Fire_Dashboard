@@ -16,24 +16,24 @@ The site has a dashboard plus pages for Forecast, Burn Windows, Air Quality, Fir
 *   **Current Conditions:** Latest observation from the nearest ASOS/AWOS station (via the Iowa Environmental Mesonet), alongside the NWS gridded forecast. It falls back to the forecast hour when the observation is more than 2 hours old. A "Rain Detected Nearby" badge and days since rain are shown.
 *   **Smoke Dispersion:** Ventilation index category, Lavdas Atmospheric Dispersion Index with stability class, and the overnight peak LVORI (smoke/fog road risk).
 *   **Fire Weather Indices:** Surface and transport wind, mixing height, Haines index, precipitation chance, KBDI, Fosberg FWI, 1/10/100-hour fuel moisture and ignition probability.
-*   **Burn Window Outlook:** The next three runs of hours in the coming 72 that meet the active prescription.
+*   **Burn Window Outlook:** The next three runs of hours in the coming 72 that meet the active prescription. A window is marked VETOED if it starts before an active NWS critical fire weather alert ends (the alert's NWS `ends` time; an alert with no end time covers every window) or if the county is under a ban that vetoes the burn (every window). An exempting ban, an unknown ban status, or NWS alerts that could not be checked add a note above the windows.
 *   **Charts:** 24-hour burn quality score and a 48-hour temperature/RH/wind trend.
 
 ### 2. Prescription (Rx) Settings
 *   **Presets:** Default, Grassland / Fuel Model 1, Pine Understory, and Site Prep / High Fuel.
-*   **Custom thresholds:** Sliders for RH, wind, temperature, minimum ventilation index and days since rain. Settings are saved in the browser.
+*   **Custom thresholds:** Sliders for RH, wind, temperature, minimum ventilation index and days since rain. Settings are saved in the browser. Open them from the Rx Parameters button in the header (an icon button on phones).
 
 ### 3. Pages
 *   **Forecast:** NWS narrative forecast, the office's Fire Weather Forecast (FWF) discussion and zone text, and a 72-hour hourly table with CSV export.
-*   **Burn Windows:** Heatmap of burn quality by hour. Hovering a cell shows its values and which prescription thresholds it misses. Daytime (10 AM–4 PM) windows of 2+ hours that meet the prescription are listed.
+*   **Burn Windows:** Heatmap of burn quality by hour. The cell colour is the general 0–100 burn quality score, which uses fixed thresholds rather than your prescription; hours outside your prescription are hatched grey and marked ×, and hours under a veto (NWS alert or burn ban, as above) are hatched red and marked ⊘. Hovering a cell shows its score and which prescription thresholds it misses. Daytime (10 AM–4 PM) windows of 2+ hours that meet the prescription are listed, with the same veto marking and notes as the dashboard outlook.
 *   **Air Quality:** Current AQI and today/tomorrow AQI forecasts from EPA AirNow, and a map of Mississippi PM2.5 and ozone monitors. In Mississippi these forecasts and monitors are MDEQ's, reported through AirNow. Burn advice is shown when AQI exceeds 100 or 150.
-*   **Fire & Smoke:** NOAA Hazard Mapping System (HMS) satellite fire detections and analyst-drawn smoke polygons, by region and date.
+*   **Fire & Smoke:** NOAA Hazard Mapping System (HMS) satellite fire detections and analyst-drawn smoke polygons, by region and date. Either layer can be switched off from the map's layer control.
 *   **Permits:** MFC burn permit records: summary and year-over-year statistics, maps of dispersion quality, permit density and smoke direction, charts by county and permit type, and a sortable table with date filters. Today's permits are enriched with the current NWS forecast for their county.
-*   **Drought:** Latest U.S. Drought Monitor map.
+*   **Drought:** Latest U.S. Drought Monitor map, labelled with the date the map is valid for (read from the USDM shapefile name).
 *   **Safety:** A go/no-go checklist (saved in the browser), burn guidelines, an index reference and links to external resources.
 
 ### 4. Printable Burn Plan
-*   One-page summary of the location, nearest station, current forecast hour, prescription criteria and a 12-hour hourly outlook, with space for notes.
+*   One-page summary of the location, nearest station, current forecast hour, prescription criteria and a 12-hour hourly outlook, with space for notes. The app header and sidebar are left off the printout.
 *   Safety section at the top: every active NWS alert (critical fire weather alerts highlighted), a warning when alerts could not be checked, and the county burn ban status.
 
 ## 🔗 Quick Access
@@ -90,6 +90,7 @@ Both are county-level only. The app does not touch the permit layer for bans, an
 *   **Unit-aware NWS conversions:** All grid values (transport wind, mixing height, temperature) are converted using the unit-of-measure (`uom`) declared by the NWS API rather than hardcoded assumptions, so the Ventilation Index and dispersion categories match official data exactly.
 *   **Timestamp-aligned forecasts:** NWS time series are joined by timestamp (not array index), correctly handling multi-hour and multi-day duration encodings. Short gaps at the end of the grid carry the last known value forward.
 *   **Location-correct dispersion modeling:** Atmospheric stability uses the sun's elevation at the forecast location and hour.
+*   **Location time zone:** Forecast hours, burn windows, charts and the printable plan show times in the forecast location's time zone (from NWS), not the viewer's computer.
 *   **Hardened API layer:** All API routes validate coordinates, station IDs, dates, and payload sizes; security headers (Content-Security-Policy, X-Frame-Options, nosniff, Referrer-Policy) are applied site-wide. The browser fetches data only from this site (`connect-src 'self'`); upstream services, MFC's ArcGIS burn ban data included, are called from the server routes, so they need no CSP entry. Map tiles (Esri), Leaflet's stylesheet (unpkg) and Vercel Analytics are the only third-party assets the page loads.
 
 ## 📄 Disclaimer

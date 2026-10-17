@@ -136,7 +136,10 @@
     -webkit-print-color-adjust: exact;
   }
 
-  /* Hide unnecessary elements during print */
+  /* Hide unnecessary elements during print: the app header (search, Rx
+     button) and the sidebar column, not just its nav links */
+  header,
+  aside,
   nav,
   footer,
   .animate-pulse,

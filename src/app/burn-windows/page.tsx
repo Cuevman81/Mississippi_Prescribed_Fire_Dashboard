@@ -5,14 +5,17 @@ import { useDashboard } from '@/lib/dashboard-context';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Clock, CheckCircle } from 'lucide-react';
+import { rxViolations, vetoesForWindow } from '@/lib/burn-windows';
+import { useWindowRestrictions, WindowRestrictionsNotice, VetoedTag } from '@/components/dashboard/WindowRestrictions';
 import { getBurnQualityColor, getBurnQualityTextColor } from '@/lib/constants';
 import { formatNumber } from '@/lib/weather-utils';
 import type { BurnWindow, HourlyForecast } from '@/lib/types';
 
 export default function BurnWindowsPage() {
   const { forecast, currentForecastIdx, prescription, timezone, isLoading } = useDashboard();
+  const restrictions = useWindowRestrictions();
   const [hoveredCell, setHoveredCell] = useState<{
-    day: string; hour: number; score: number; quality: string; reasons?: string[];
+    day: string; hour: number; score: number; quality: string; reasons?: string[]; vetoes?: string[];
   } | null>(null);
 
   // Helper: get local hour from ISO time string using the forecast timezone
@@ -53,12 +56,7 @@ export default function BurnWindowsPage() {
       if (hour < 10 || hour > 16) continue;
 
       // Check if it meets prescription
-      if (
-        h.temp >= prescription.tempMin && h.temp <= prescription.tempMax &&
-        h.humidity >= prescription.humidityMin && h.humidity <= prescription.humidityMax &&
-        h.windSpeed >= prescription.windSpeedMin && h.windSpeed <= prescription.windSpeedMax &&
-        h.ventilationIndex >= prescription.minVentilationIndex
-      ) {
+      if (rxViolations(h, prescription).length === 0) {
         const dateKey = getLocalDateLabel(h.time);
         if (!byDay.has(dateKey)) byDay.set(dateKey, []);
         byDay.get(dateKey)!.push(h);
@@ -95,9 +93,10 @@ export default function BurnWindowsPage() {
 
   // Build heatmap grid data: days (rows) × hours (columns)
   const { days, heatmapGrid } = useMemo(() => {
-    if (!futureForecast.length) return { days: [] as string[], heatmapGrid: new Map<string, Map<number, { score: number; quality: string; reasons: string[] }>>() };
+    type Cell = { score: number; quality: string; reasons: string[]; vetoes: string[] };
+    if (!futureForecast.length) return { days: [] as string[], heatmapGrid: new Map<string, Map<number, Cell>>() };
 
-    const grid = new Map<string, Map<number, { score: number; quality: string; reasons: string[] }>>();
+    const grid = new Map<string, Map<number, Cell>>();
     const dayOrder: string[] = [];
 
     for (const h of futureForecast) {
@@ -109,20 +108,14 @@ export default function BurnWindowsPage() {
         dayOrder.push(day);
       }
       
-      const reasons: string[] = [];
-      if (h.temp < prescription.tempMin) reasons.push('Low Temp');
-      if (h.temp > prescription.tempMax) reasons.push('High Temp');
-      if (h.humidity < prescription.humidityMin) reasons.push('Low RH');
-      if (h.humidity > prescription.humidityMax) reasons.push('High RH');
-      if (h.windSpeed < prescription.windSpeedMin) reasons.push('Low Wind');
-      if (h.windSpeed > prescription.windSpeedMax) reasons.push('High Wind');
-      if (h.ventilationIndex < prescription.minVentilationIndex) reasons.push('Low VI');
-      
-      grid.get(day)!.set(hour, { score: h.burnScore, quality: h.burnQuality, reasons });
+      // The score uses fixed general thresholds; the Rx check is separate
+      const reasons = rxViolations(h, prescription);
+      const vetoes = vetoesForWindow(restrictions, Date.parse(h.time)).map((v) => v.message);
+      grid.get(day)!.set(hour, { score: h.burnScore, quality: h.burnQuality, reasons, vetoes });
     }
 
     return { days: dayOrder, heatmapGrid: grid };
-  }, [futureForecast, prescription, getLocalDateLabel, getLocalHour]);
+  }, [futureForecast, prescription, restrictions, getLocalDateLabel, getLocalHour]);
 
   if (isLoading) {
     return (
@@ -153,6 +146,7 @@ export default function BurnWindowsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
+          <WindowRestrictionsNotice restrictions={restrictions} />
           {burnWindows.length === 0 ? (
             <p className="text-sm text-slate-500">
               No burn windows found that meet all prescription parameters. Try adjusting your
@@ -160,23 +154,29 @@ export default function BurnWindowsPage() {
             </p>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {burnWindows.map((w, i) => (
+              {burnWindows.map((w, i) => {
+                const vetoed = vetoesForWindow(restrictions, Date.parse(w.start)).length > 0;
+                return (
                 <div
                   key={i}
-                  className="border rounded-lg p-3"
-                  style={{ borderLeftWidth: 4, borderLeftColor: getBurnQualityColor(w.avgBurnScore) }}
+                  className={`border rounded-lg p-3 ${vetoed ? 'border-red-300' : ''}`}
+                  style={{ borderLeftWidth: 4, borderLeftColor: vetoed ? '#dc2626' : getBurnQualityColor(w.avgBurnScore) }}
                 >
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center justify-between mb-2 gap-2">
                     <p className="font-medium text-sm">{w.date}</p>
-                    <Badge
-                      className="text-[10px]"
-                      style={{ backgroundColor: getBurnQualityColor(w.avgBurnScore), color: getBurnQualityTextColor(w.avgBurnScore) }}
-                    >
-                      {w.burnQuality}
-                    </Badge>
+                    {vetoed ? (
+                      <VetoedTag />
+                    ) : (
+                      <Badge
+                        className="text-[10px]"
+                        style={{ backgroundColor: getBurnQualityColor(w.avgBurnScore), color: getBurnQualityTextColor(w.avgBurnScore) }}
+                      >
+                        {w.burnQuality}
+                      </Badge>
+                    )}
                   </div>
-                  <p className="text-xs text-slate-600">
-                    <CheckCircle className="h-3 w-3 inline mr-1 text-green-500" />
+                  <p className={`text-xs ${vetoed ? 'text-slate-500 line-through' : 'text-slate-600'}`}>
+                    {!vetoed && <CheckCircle className="h-3 w-3 inline mr-1 text-green-500" />}
                     {w.startTime} - {w.endTime} ({w.hours} hrs)
                   </p>
                   <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2 text-xs text-slate-500">
@@ -189,7 +189,8 @@ export default function BurnWindowsPage() {
                     <span className="col-span-2">Dispersion: {w.dispersionCategory}</span>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>
@@ -201,6 +202,11 @@ export default function BurnWindowsPage() {
           <CardTitle className="text-sm font-medium text-slate-500">
             Burn Quality Heatmap (Score by Day & Hour)
           </CardTitle>
+          <p className="text-xs text-slate-500">
+            Cell colour is the general burn-quality score, which uses fixed thresholds (40-80°F, 30-55% RH,
+            4-15 mph wind, VI 40,000+), not your Rx. Hatched cells marked &times; are outside your Rx; red ones marked
+            &#8856; are vetoed by an NWS alert or burn ban.
+          </p>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -213,14 +219,24 @@ export default function BurnWindowsPage() {
                   <span style={{ color: getBurnQualityColor(hoveredCell.score) }} className="font-bold">
                     {hoveredCell.quality} ({hoveredCell.score})
                   </span>
-                  {hoveredCell.reasons && hoveredCell.reasons.length > 0 && (
+                  {hoveredCell.vetoes && hoveredCell.vetoes.length > 0 && (
+                    <span className="ml-2 px-1.5 py-0.5 bg-red-600 text-white rounded text-[9px] uppercase font-bold">
+                      Vetoed: {hoveredCell.vetoes.join('; ')}
+                    </span>
+                  )}
+                  {hoveredCell.reasons && hoveredCell.reasons.length > 0 ? (
                     <div className="flex gap-1 ml-2">
+                      <span className="text-[10px] font-bold text-red-700">Outside Rx:</span>
                       {hoveredCell.reasons.map((r, i) => (
                         <span key={i} className="px-1.5 py-0.5 bg-red-50 text-red-600 border border-red-100 rounded text-[9px] uppercase font-bold">
                           {r}
                         </span>
                       ))}
                     </div>
+                  ) : (
+                    <span className="ml-2 px-1.5 py-0.5 bg-green-50 text-green-700 border border-green-200 rounded text-[9px] uppercase font-bold">
+                      Within Rx
+                    </span>
                   )}
                 </div>
               ) : (
@@ -248,21 +264,30 @@ export default function BurnWindowsPage() {
                   </div>
                   {hours.map((h) => {
                     const cell = heatmapGrid.get(day)?.get(h);
+                    const vetoed = !!cell && cell.vetoes.length > 0;
+                    const outOfRx = !!cell && cell.reasons.length > 0;
+                    const rxText = cell
+                      ? (vetoed ? `vetoed (${cell.vetoes.join('; ')}), ` : '') +
+                        (outOfRx ? `outside your Rx (${cell.reasons.join(', ')})` : 'within your Rx')
+                      : '';
                     return (
                       <div
                         key={`${day}-${h}`}
                         className="aspect-square rounded-sm cursor-pointer transition-transform hover:scale-110 hover:z-10 relative flex items-center justify-center text-[9px] font-bold select-none"
                         style={{
-                          backgroundColor: cell ? getBurnQualityColor(cell.score) : '#f1f5f9',
-                          color: cell ? getBurnQualityTextColor(cell.score) : '#ffffff',
+                          // Vetoed and out-of-Rx hours are hatched, with the score colour as an
+                          // inset ring, so a high score can't read as a go
+                          background: !cell ? '#f1f5f9' : vetoed ? VETOED_BG : outOfRx ? OUT_OF_RX_BG : getBurnQualityColor(cell.score),
+                          boxShadow: vetoed || outOfRx ? `inset 0 0 0 2px ${getBurnQualityColor(cell!.score)}` : undefined,
+                          color: !cell ? '#ffffff' : vetoed ? '#991b1b' : outOfRx ? '#475569' : getBurnQualityTextColor(cell.score),
                           minHeight: '20px',
                         }}
-                        onMouseEnter={() => cell && setHoveredCell({ day, hour: h, score: cell.score, quality: cell.quality, reasons: cell.reasons })}
+                        onMouseEnter={() => cell && setHoveredCell({ day, hour: h, score: cell.score, quality: cell.quality, reasons: cell.reasons, vetoes: cell.vetoes })}
                         onMouseLeave={() => setHoveredCell(null)}
-                        title={cell ? `${cell.quality} (${cell.score})` : 'No data'}
-                        aria-label={cell ? `${day} hour ${h}: ${cell.quality} quality, score ${cell.score}` : `${day} hour ${h}: no data`}
+                        title={cell ? `${cell.quality} (${cell.score}), ${rxText}` : 'No data'}
+                        aria-label={cell ? `${day} hour ${h}: ${cell.quality} quality, score ${cell.score}, ${rxText}` : `${day} hour ${h}: no data`}
                       >
-                        {cell ? cell.quality[0] : ''}
+                        {cell ? (vetoed ? '⊘' : outOfRx ? '×' : cell.quality[0]) : ''}
                       </div>
                     );
                   })}
@@ -272,7 +297,7 @@ export default function BurnWindowsPage() {
           </div>
 
           {/* Legend */}
-          <div className="flex items-center gap-4 mt-4 text-xs text-slate-500">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-4 text-xs text-slate-500">
             <span className="flex items-center gap-1">
               <span className="w-3 h-3 rounded" style={{ backgroundColor: '#16a34a' }} /> Excellent (90+)
             </span>
@@ -289,6 +314,12 @@ export default function BurnWindowsPage() {
               <span className="w-3 h-3 rounded" style={{ backgroundColor: '#dc2626' }} /> Poor (&lt;30)
             </span>
             <span className="flex items-center gap-1">
+              <span className="w-3 h-3 rounded flex items-center justify-center text-[9px] font-bold text-slate-600" style={{ background: OUT_OF_RX_BG }}>&times;</span> Outside your Rx
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-3 h-3 rounded flex items-center justify-center text-[9px] font-bold text-red-800" style={{ background: VETOED_BG }}>⊘</span> Vetoed (NWS alert or burn ban)
+            </span>
+            <span className="flex items-center gap-1">
               <span className="w-3 h-3 rounded bg-slate-100 border" /> No data
             </span>
           </div>
@@ -297,6 +328,9 @@ export default function BurnWindowsPage() {
     </div>
   );
 }
+
+const OUT_OF_RX_BG = 'repeating-linear-gradient(45deg, #e2e8f0 0 3px, #f8fafc 3px 6px)';
+const VETOED_BG = 'repeating-linear-gradient(45deg, #fecaca 0 3px, #fef2f2 3px 6px)';
 
 function buildWindow(date: string, hours: HourlyForecast[], timezone: string): BurnWindow {
   const avgTemp = hours.reduce((s, h) => s + h.temp, 0) / hours.length;
@@ -320,6 +354,7 @@ function buildWindow(date: string, hours: HourlyForecast[], timezone: string): B
 
   return {
     date,
+    start: hours[0].time,
     startTime: startD.toLocaleTimeString('en-US', { timeZone: timezone, hour: 'numeric', hour12: true }),
     endTime: endD.toLocaleTimeString('en-US', { timeZone: timezone, hour: 'numeric', hour12: true }),
     hours: hours.length,

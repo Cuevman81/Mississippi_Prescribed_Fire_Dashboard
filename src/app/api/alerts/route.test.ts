@@ -36,6 +36,15 @@ describe('burn-veto alerts reach the browser', () => {
     expect(returned).not.toContain('Flood Warning');
     expect(body.alertsAvailable).toBe(true);
   });
+
+  it("passes the hazard's end time (NWS `ends`, not the earlier `expires`)", async () => {
+    // Shape of a live NWS Red Flag Warning, 2026-10-17
+    const rfw = { properties: { ...feature('Red Flag Warning').properties, expires: '2026-10-17T15:45:00-05:00', ends: '2026-10-17T19:00:00-05:00' } };
+    nws({ alerts: { features: [rfw, feature('Fire Weather Watch')] } });
+    const body = await (await GET(req())).json();
+    expect(body.alerts[0].ends).toBe('2026-10-17T19:00:00-05:00');
+    expect(body.alerts[1].ends).toBeNull();
+  });
 });
 
 describe('an NWS outage is not reported as "no alerts"', () => {

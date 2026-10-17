@@ -323,13 +323,15 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       ]);
 
       // Process weather data
+      let forecastTimeZone = 'America/Chicago';
       if (weatherRes.ok) {
         const weatherData = await weatherRes.json();
         const meta = weatherData.metadata;
         const grid = weatherData.gridFields;
 
         setNwsOffice(meta.cwa);
-        setTimezone(meta.timeZone || 'America/Chicago');
+        forecastTimeZone = meta.timeZone || 'America/Chicago';
+        setTimezone(forecastTimeZone);
         setWeatherGridData({ metadata: meta, gridFields: grid, lat: loc.lat, lon: loc.lon });
 
         const narr = (weatherData.narrativeForecast?.periods || weatherData.narrativePeriods || []).map((p: {
@@ -418,7 +420,9 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       } catch { }
 
       if (weatherRes.ok) {
-        setLastUpdated(new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }));
+        setLastUpdated(new Date().toLocaleTimeString('en-US', {
+          timeZone: forecastTimeZone, hour: 'numeric', minute: '2-digit', hour12: true, timeZoneName: 'short',
+        }));
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');

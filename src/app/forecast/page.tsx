@@ -9,7 +9,7 @@ import { Download, Loader2 } from 'lucide-react';
 import { getBurnQualityColor } from '@/lib/constants';
 
 export default function ForecastPage() {
-  const { forecast, currentForecastIdx, narrativeForecast, fireDiscussion, zoneForecast, isLoading, nwsOffice, location } = useDashboard();
+  const { forecast, currentForecastIdx, narrativeForecast, fireDiscussion, zoneForecast, isLoading, nwsOffice, location, timezone } = useDashboard();
   const currentRowRef = useRef<HTMLTableRowElement>(null);
 
   // Auto-scroll to the current forecast row on load
@@ -140,7 +140,7 @@ export default function ForecastPage() {
                       <td className="px-2 py-1.5 whitespace-nowrap font-medium">
                         {isCurrent && <span className="text-orange-600 mr-1">&#9658;</span>}
                         {new Date(h.time).toLocaleString('en-US', {
-                          weekday: 'short', hour: 'numeric', hour12: true,
+                          timeZone: timezone, weekday: 'short', hour: 'numeric', hour12: true,
                         })}
                       </td>
                       <td className="px-2 py-1.5">{h.temp}°F</td>

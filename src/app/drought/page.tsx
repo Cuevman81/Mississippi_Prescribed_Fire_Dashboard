@@ -5,11 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, Droplets } from 'lucide-react';
 import { DROUGHT_COLORS } from '@/lib/constants';
 import dynamic from 'next/dynamic';
+import { formatUsdmDate } from '@/lib/drought';
 
 const DroughtMap = dynamic(() => import('@/components/maps/DroughtMap'), { ssr: false });
 
 export default function DroughtPage() {
-  const [droughtData, setDroughtData] = useState<(GeoJSON.FeatureCollection & { lastUpdated?: string }) | null>(null);
+  const [droughtData, setDroughtData] = useState<(GeoJSON.FeatureCollection & { validDate?: string | null }) | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -36,11 +37,11 @@ export default function DroughtPage() {
             <Droplets className="h-4 w-4 text-blue-500" />
             U.S. Drought Monitor
           </CardTitle>
-          {droughtData?.lastUpdated && (
+          {droughtData && (
             <p className="text-[10px] text-slate-400">
-              Last updated: {new Date(droughtData.lastUpdated).toLocaleDateString('en-US', {
-                month: 'short', day: 'numeric', year: 'numeric'
-              })}
+              {droughtData.validDate
+                ? `Map valid ${formatUsdmDate(droughtData.validDate)}`
+                : 'Map date unavailable'}
             </p>
           )}
         </CardHeader>

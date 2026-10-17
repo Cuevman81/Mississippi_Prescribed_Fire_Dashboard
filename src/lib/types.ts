@@ -106,6 +106,8 @@ export interface AlertInfo {
   severity: string;
   onset: string;
   expires: string;
+  /** End of the hazard (NWS `ends`); null when NWS gives none */
+  ends?: string | null;
 }
 
 // --- Air Quality ---
@@ -227,6 +229,8 @@ export interface DroughtFeature {
 
 export interface BurnWindow {
   date: string;
+  /** ISO time the window's first hour starts */
+  start: string;
   startTime: string;
   endTime: string;
   hours: number;
