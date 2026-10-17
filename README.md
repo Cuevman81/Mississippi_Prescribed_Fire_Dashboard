@@ -9,6 +9,7 @@ A comprehensive web-based decision support tool for prescribed fire managers, pr
 ### 1. Real-Time Operational Dashboard
 *   **Burn Status Summary:** Instant "Within/Outside Prescription" status with specific reasons for sub-optimal conditions. 
 *   **Critical Fire Alerts:** High-priority "Veto" logic that automatically flags the burn as RESTRICTED during NWS Red Flag Warnings, Fire Weather Watches, Fire Warnings, Extreme Fire Danger, and Extreme Heat Warnings. Dense Smoke, Air Stagnation, and Dense Fog advisories are always shown. Alerts auto-refresh every 5 minutes so warnings issued mid-session appear without reloading, and if NWS alerts cannot be checked the status card says so instead of showing green.
+*   **County Burn Bans:** Statewide list of Mississippi counties under a burn ban, from Mississippi Forestry Commission (MFC) data, with an "as of" time, a link to MFC, each order's exemptions, and banned counties highlighted on the maps. If the selected location is in a banned county, the status card shows it prominently (see [County burn bans](#county-burn-bans) for when a ban vetoes the burn).
 *   **Interactive Location Map:** Click-to-set location functionality to get pinpoint forecasts for any burn unit.
 *   **Current Conditions:** Real-time data from the nearest ASOS/AWOS weather stations integrated with NWS high-resolution grid forecasts.
 
@@ -39,7 +40,7 @@ No installation or technical setup is required for end users. Simply open the li
 *   **Framework:** [Next.js 16+](https://nextjs.org/) (React 19) with Turbopack
 *   **Mapping:** Leaflet & React-Leaflet on keyless Esri basemaps (Powered by Esri)
 *   **Visualization:** Recharts (Dynamic Fire Density & Smoke Scattering)
-*   **Data Sources:** NWS API, EPA AirNow, NOAA HMS, U.S. Drought Monitor, MFC, Iowa Environmental Mesonet (station observations), RCC-ACIS (PRISM grids for KBDI), OpenStreetMap Nominatim (place search).
+*   **Data Sources:** NWS API, EPA AirNow, NOAA HMS, U.S. Drought Monitor, MFC (burn permits and county burn bans), Iowa Environmental Mesonet (station observations), RCC-ACIS (PRISM grids for KBDI), OpenStreetMap Nominatim (place search).
 
 To run it locally: `npm install`, put `AIRNOW_API_KEY` (and optionally `NWS_USER_AGENT`, the User-Agent sent to NWS and Nominatim) in `.env.local`, then `npm run dev`. `npm test` runs the unit tests.
 
@@ -54,12 +55,31 @@ All fire-weather indices are computed from published, citable methods:
 *   **Fuel moisture:** Simard (1968) equilibrium moisture content, with ignition alerts keyed to southern Rx guide fine-fuel thresholds.
 *   **Ventilation Index** categories per the Southern Forestry Smoke Management Guidebook.
 
+### County Burn Bans
+
+**Source.** MFC posts its [burn ban map](https://www.mfc.ms.gov/burning-info/burn-bans/) as an image, but the same data drives MFC's Survey123 burn permit application and is public on MFC's ArcGIS organization:
+
+*   [MFC Burn Permits County Boundaries](https://services5.arcgis.com/hE6urTTXj32LRUqx/arcgis/rest/services/MFC_Burn_Permits_County_Boundaries/FeatureServer/0): one polygon per county with `hasCountyBan` / `hasMFCBan`. This is the ban list and the map outlines. The layer's `dataLastEditDate` is the "as of" time (MFC's notebook refreshes it hourly).
+*   [ms_counties_burn_ban_info.csv](https://www.arcgis.com/home/item.html?id=e909364200594201a846c2f46326313a): which numbered exemptions from MFC's exemption key each county's order lists (1 MFC, 2 Certified Burn Managers, 3 County Fire Services, 4 Commercial contractors, 5 Agricultural field burn). Exemption 6, "Other", is not in the feed.
+
+Both are county-level only. The app does not touch the permit layer for bans, and requests only county name and ban flags.
+
+**When a ban vetoes the burn.** Under [Miss. Code § 49-19-351](https://law.justia.com/codes/mississippi/title-49/chapter-19/restrictions-on-outdoor-burning/section-49-19-351/), a county Board of Supervisors may "prohibit or restrict" outdoor burning once MFC finds drought or wildfire conditions. Violation is a misdemeanor ($100–$500). Neither that section nor the Prescribed Burning Act (§ 49-19-301 et seq.) exempts prescribed burning; each order lists its own exemptions. So for the selected county:
+
+*   **Ban whose order lists exemption 2 (Certified Burn Managers):** a prominent warning, not a veto. A certified prescribed burn manager may burn under an MFC burn permit; all other burning is prohibited.
+*   **Ban whose order does not list exemption 2, or an MFC ban:** RESTRICTED veto, the same as a Red Flag Warning.
+*   **Ban whose exemptions could not be read:** a warning that the exemption status is unknown.
+
+**Failing visibly.** If the MFC county layer cannot be reached, is incomplete (not all 82 counties) or is malformed, the dashboard says "Burn ban status unavailable" and the status card never shows green. It never shows "no bans" in that case. The same applies when the county lookup for the selected point fails, or when MFC's data is more than a day old and the county shows no ban.
+
+**Not covered.** Statewide or partial-state bans proclaimed by the Governor (e.g. 2023, with no exemptions) are published as press releases. The feed may not reflect them, so check mfc.ms.gov during statewide drought. Ban expiry dates are on the MFC order, not in the feed. The NWS Fire Weather Notification (FWN) check is kept as a secondary notice, but Mississippi's offices (JAN, MEG, MOB, LIX) issue none at present.
+
 ### Data Integrity & Security
 
 *   **Unit-aware NWS conversions:** All grid values (transport wind, mixing height, temperature) are converted using the unit-of-measure (`uom`) declared by the NWS API rather than hardcoded assumptions, so the Ventilation Index and dispersion categories match official data exactly.
 *   **Timestamp-aligned forecasts:** NWS time series are joined by timestamp (not array index), correctly handling multi-hour and multi-day duration encodings and gaps in grid coverage.
 *   **Timezone-correct dispersion modeling:** Atmospheric stability adjustments use the forecast location's local hour.
-*   **Hardened API layer:** All API routes validate coordinates, station IDs, dates, and payload sizes; security headers (Content-Security-Policy, X-Frame-Options, nosniff, Referrer-Policy) are applied site-wide.
+*   **Hardened API layer:** All API routes validate coordinates, station IDs, dates, and payload sizes; security headers (Content-Security-Policy, X-Frame-Options, nosniff, Referrer-Policy) are applied site-wide. The browser only calls `/api/*` (`connect-src 'self'`); upstream services, MFC's ArcGIS burn ban data included, are called from the server routes, so they need no CSP entry.
 
 ## 📄 Disclaimer
 This dashboard is a decision-support tool only. All burn decisions must be made by qualified prescribed fire managers using current field conditions. Always verify conditions on-site before ignition.

@@ -126,7 +126,8 @@ export async function GET(request: NextRequest) {
         // Fire discussion not available — non-critical
       }
 
-      // Check for burn ban notifications (FWN product)
+      // NWS burn ban notifications (FWN product). Secondary: MS offices rarely
+      // issue FWN, so county bans come from MFC via /api/burn-bans
       try {
         const fwnRes = await fetch(
           `https://api.weather.gov/products/types/FWN/locations/${nwsOffice}`,

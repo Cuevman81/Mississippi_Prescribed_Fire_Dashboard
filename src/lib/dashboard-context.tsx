@@ -79,6 +79,7 @@ import {
   lvori,
 } from './dispersion';
 import type { KBDIData } from './types';
+import { banStatusForLocation, type BurnBanResponse, type LocationBanStatus } from './burn-bans';
 
 interface DashboardState {
   // Location
@@ -103,7 +104,11 @@ interface DashboardState {
   alertsAvailable: boolean; // false until NWS alerts were actually checked
   fireDiscussion: string;
   zoneForecast: string;
-  burnBanInfo: string;
+  burnBanInfo: string; // NWS FWN text, when an office issues one
+
+  // MFC county burn bans (statewide list + what applies at the selected location)
+  burnBans: BurnBanResponse | null; // null until the first check finishes
+  burnBanStatus: LocationBanStatus;
 
   // Station
   stationObservation: StationObservation | null;
@@ -164,6 +169,9 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const [fireDiscussion, setFireDiscussion] = useState('');
   const [zoneForecast, setZoneForecast] = useState('');
   const [burnBanInfo, setBurnBanInfo] = useState('');
+  const [burnBans, setBurnBans] = useState<BurnBanResponse | null>(null);
+  // Bumped on every search, like aqRequestRef
+  const banRequestRef = React.useRef(0);
 
   const [stationObservation, setStationObservation] = useState<StationObservation | null>(null);
 
@@ -187,6 +195,23 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   React.useEffect(() => {
     const id = setInterval(() => setNowTick(Date.now()), 5 * 60 * 1000);
     return () => clearInterval(id);
+  }, []);
+
+  // MFC burn bans for a location. Any failure is stored as "unavailable" so
+  // the status card says so instead of showing no ban.
+  const loadBurnBans = useCallback(async (lat: number, lon: number) => {
+    const request = ++banRequestRef.current;
+    let data: BurnBanResponse;
+    try {
+      const res = await fetch(`/api/burn-bans?lat=${lat}&lon=${lon}`);
+      const body = await res.json().catch(() => null);
+      data = res.ok && body?.available === true
+        ? body
+        : { available: false, reason: body?.reason || 'Burn ban status unavailable', source: body?.source || 'https://www.mfc.ms.gov/burning-info/burn-bans/' };
+    } catch {
+      data = { available: false, reason: 'Burn ban status unavailable', source: 'https://www.mfc.ms.gov/burning-info/burn-bans/' };
+    }
+    if (request === banRequestRef.current) setBurnBans(data);
   }, []);
 
   // Auto-refresh alerts every 5 minutes
@@ -215,9 +240,12 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
-    const interval = setInterval(refreshAlerts, 5 * 60 * 1000);
+    const interval = setInterval(() => {
+      void refreshAlerts();
+      void loadBurnBans(location.lat, location.lon);
+    }, 5 * 60 * 1000);
     return () => clearInterval(interval);
-  }, [location, nwsOffice]);
+  }, [location, nwsOffice, loadBurnBans]);
 
   const fetchForecastByCoords = useCallback(async (lat: number, lon: number, displayName?: string) => {
     setIsLoading(true);
@@ -261,6 +289,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       setFireDiscussion('');
       setZoneForecast('');
       setBurnBanInfo('');
+      setBurnBans(null);
       setCurrentAQI([]);
       setAqiForecast([]);
       setStationObservation(null);
@@ -283,6 +312,9 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         loadAQ<AQIForecast[]>(`/api/air-quality?type=forecast&lat=${loc.lat}&lon=${loc.lon}`, setAqiForecast),
         loadAQ<AQIMonitor[]>(`/api/air-quality?type=monitors`, setAqiMonitors),
       ]).then(() => { if (isCurrentRequest()) setAqiLoading(false); });
+
+      // Burn bans don't depend on the forecast; load them alongside it
+      void loadBurnBans(loc.lat, loc.lon);
 
       // Step 2: Fetch weather + drought in parallel (alerts follow the weather)
       const [weatherRes, kbdiRes] = await Promise.all([
@@ -393,7 +425,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [loadBurnBans]);
 
   // Memoized forecast computation that recalculates when weatherGridData or daysSinceRain changes
   const forecast = React.useMemo<HourlyForecast[]>(() => {
@@ -577,6 +609,14 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     }
   }, [fetchForecastByCoords]);
 
+  // While the first check is in flight this reads "unavailable", which keeps
+  // the card off green until bans are actually confirmed
+  const burnBanStatus = React.useMemo(() => {
+    const loc = burnBans?.location;
+    const county = !loc || loc.lookupFailed ? undefined : loc.county;
+    return banStatusForLocation(burnBans, county);
+  }, [burnBans]);
+
   // Find the forecast hour closest to the current time
   const currentForecastIdx = React.useMemo(() => {
     if (!forecast.length) return 0;
@@ -612,6 +652,8 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         fireDiscussion,
         zoneForecast,
         burnBanInfo,
+        burnBans,
+        burnBanStatus,
         stationObservation,
         currentAQI,
         aqiForecast,

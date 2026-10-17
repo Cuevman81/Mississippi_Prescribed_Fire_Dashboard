@@ -9,6 +9,7 @@ import { FireIndices } from '@/components/dashboard/FireIndices';
 import { BurnQualityChart } from '@/components/dashboard/BurnQualityChart';
 import { WeatherTrendChart } from '@/components/dashboard/WeatherTrendChart';
 import { BurnWindowFinder } from '@/components/dashboard/BurnWindowFinder';
+import { BurnBanCard } from '@/components/dashboard/BurnBanCard';
 import { Flame, Loader2 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
@@ -76,6 +77,8 @@ export default function DashboardPage() {
           <LocationMap />
         </div>
       </div>
+
+      <BurnBanCard />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <SmokeDispersion />

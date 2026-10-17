@@ -5,6 +5,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useDashboard } from '@/lib/dashboard-context';
 import { LightGrayBasemap } from './Basemap';
+import { BurnBanLayer } from './BurnBanLayer';
 import { MapPin, Radio } from 'lucide-react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
@@ -53,7 +54,8 @@ export default function LocationMap() {
         style={{ height: '100%', width: '100%' }}
       >
         <LightGrayBasemap />
-        
+        <BurnBanLayer />
+
         <MapEvents />
 
         <Marker position={center} icon={customMarkerIcon}>

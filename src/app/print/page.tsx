@@ -2,11 +2,12 @@
 
 import { useDashboard } from '@/lib/dashboard-context';
 import { getBurnQualityColor, CRITICAL_FIRE_ALERTS } from '@/lib/constants';
-import { Flame, MapPin, Wind, Thermometer, Droplets, ArrowUpDown, AlertTriangle } from 'lucide-react';
+import { Flame, MapPin, Wind, Thermometer, Droplets, ArrowUpDown, AlertTriangle, Ban } from 'lucide-react';
+import { EXEMPTION_LABELS, formatBanTime } from '@/lib/burn-bans';
 import { useEffect } from 'react';
 
 export default function PrintPlanPage() {
-  const { location, forecast, currentForecastIdx, prescription, stationObservation, alerts, alertsAvailable } = useDashboard();
+  const { location, forecast, currentForecastIdx, prescription, stationObservation, alerts, alertsAvailable, burnBans, burnBanStatus } = useDashboard();
 
   useEffect(() => {
     // Optional: automatically trigger print dialog
@@ -55,6 +56,30 @@ export default function PrintPlanPage() {
               </h2>
               <p className="text-sm font-bold mt-0.5 text-amber-700">
                 The absence of alerts on this plan is not confirmed. Verify active alerts at weather.gov before ignition.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* County burn ban (MFC) */}
+      {burnBanStatus.effect !== 'none' && (
+        <div className={`mb-6 p-4 rounded-lg border-2 ${burnBanStatus.effect === 'restricted' ? 'bg-red-50 border-red-600' : 'bg-amber-50 border-amber-500'}`}>
+          <div className="flex items-start gap-3">
+            <Ban className={`h-6 w-6 flex-shrink-0 ${burnBanStatus.effect === 'restricted' ? 'text-red-600' : 'text-amber-600'}`} />
+            <div>
+              <h2 className={`font-bold text-lg uppercase tracking-tight ${burnBanStatus.effect === 'restricted' ? 'text-red-800' : 'text-amber-800'}`}>
+                {burnBanStatus.effect === 'unknown' ? 'County burn ban status not confirmed' : `County burn ban: ${burnBanStatus.county} County`}
+              </h2>
+              <p className="text-sm font-bold mt-0.5">{burnBanStatus.message}</p>
+              {burnBanStatus.ban?.exemptions && (
+                <p className="text-xs mt-1">
+                  Exemptions on this order: {burnBanStatus.ban.exemptions.length ? burnBanStatus.ban.exemptions.map((n) => EXEMPTION_LABELS[n]).join('; ') : 'none'}
+                </p>
+              )}
+              <p className="text-xs mt-1 text-slate-600">
+                Source: Mississippi Forestry Commission (mfc.ms.gov/burning-info/burn-bans)
+                {burnBans?.available ? `, data as of ${formatBanTime(burnBans.asOf)}` : ''}. Miss. Code § 49-19-351.
               </p>
             </div>
           </div>

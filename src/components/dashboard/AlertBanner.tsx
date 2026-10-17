@@ -100,7 +100,7 @@ export function AlertBanner() {
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-3 shadow-sm">
           <Ban className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
           <div>
-            <p className="font-semibold text-amber-800 text-sm">Burn Ban Notice</p>
+            <p className="font-semibold text-amber-800 text-sm">NWS Burn Ban Notice (Fire Weather Notification)</p>
             <p className="text-amber-700 text-xs mt-1 whitespace-pre-wrap line-clamp-3">
               {burnBanInfo.slice(0, 300)}
             </p>
